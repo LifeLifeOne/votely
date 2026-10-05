@@ -38,3 +38,7 @@ kubeconfig*
 # CI caches
 .cache/
 .npm/
+
+# Test reports
+junit.xml
+coverage.xml

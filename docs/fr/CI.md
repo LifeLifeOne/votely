@@ -48,6 +48,24 @@ ou un lint en échec.
 | `lint` | `backend:lint` | ruff (règles de lint, ordre des imports) et ruff format |
 | | `frontend:lint` | oxlint (les avertissements font échouer le job), Prettier, TypeScript |
 | | `e2e:lint` | Prettier, TypeScript |
+| `test` | `backend:test` | pytest : tests unitaires et d'intégration face à un service PostgreSQL 16, migrations comprises ; couverture ≥ 90 % |
+| | `frontend:test` | Vitest : composants et pages face à une fausse API (MSW) ; couverture ≥ 80 % des lignes |
+
+Chaque job de test n'attend que le lint de son propre composant (`needs`) : un lint frontend lent
+ne retarde jamais les tests du backend.
+
+`backend:test` tourne avec `CI=true` (toujours défini par GitLab) : si PostgreSQL était
+injoignable, les tests d'intégration échoueraient au lieu d'être ignorés comme en local.
+
+## Rapports
+
+| Rapport | Où il apparaît |
+|---|---|
+| JUnit (`junit.xml`) | Onglet *Tests* du pipeline, et widget de la merge request (nouveaux échecs, tests corrigés) |
+| Pourcentage de couverture | Widget de la merge request et liste des jobs, extrait du log du job |
+| Cobertura (`coverage.xml`) | Lignes couvertes et non couvertes surlignées dans le diff de la merge request |
+
+Les rapports sont envoyés même quand les tests échouent (`when: always`) et conservés une semaine.
 
 ## Cache
 
