@@ -3,7 +3,9 @@ from fastapi.responses import JSONResponse
 
 from app.domain.errors import (
     DomainError,
+    EmailAlreadyRegisteredError,
     InvalidClosingDateError,
+    InvalidCredentialsError,
     OptionNotFoundError,
     PollClosedError,
     PollNotFoundError,
@@ -14,6 +16,8 @@ STATUS_BY_ERROR: dict[type[DomainError], int] = {
     OptionNotFoundError: status.HTTP_422_UNPROCESSABLE_CONTENT,
     InvalidClosingDateError: status.HTTP_422_UNPROCESSABLE_CONTENT,
     PollClosedError: status.HTTP_409_CONFLICT,
+    EmailAlreadyRegisteredError: status.HTTP_409_CONFLICT,
+    InvalidCredentialsError: status.HTTP_401_UNAUTHORIZED,
 }
 
 

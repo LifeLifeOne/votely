@@ -2,10 +2,36 @@ import uuid
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, field_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    StringConstraints,
+    field_validator,
+)
 
 Question = Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=200)]
 OptionLabel = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=12, max_length=128)
+
+
+class Credentials(BaseModel):
+    email: EmailStr
+    password: str = Field(max_length=128)
+
+
+class UserRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    email: str
+    created_at: datetime
 
 
 class PollCreate(BaseModel):

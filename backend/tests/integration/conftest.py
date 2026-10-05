@@ -63,7 +63,7 @@ def session(engine) -> Iterator[Session]:
     with sessionmaker(bind=engine, expire_on_commit=False)() as session:
         yield session
     with engine.begin() as connection:
-        connection.execute(text("TRUNCATE polls, options, votes RESTART IDENTITY CASCADE"))
+        connection.execute(text("TRUNCATE users, polls, options, votes RESTART IDENTITY CASCADE"))
 
 
 @pytest.fixture
