@@ -2,18 +2,21 @@ import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 
 import type { Credentials } from '../api/auth'
+import type { NewPoll } from '../api/polls'
 import type { User } from '../api/types'
 import { PASSWORD, alice, poll, results } from './fixtures'
 
 /** Fake server-side state, reset after each test. Set `session.user` to start logged in. */
-export const session: { user: User | null; accounts: Map<string, string> } = {
-  user: null,
-  accounts: new Map(),
-}
+export const session: {
+  user: User | null
+  accounts: Map<string, string>
+  votedPollIds: Set<string>
+} = { user: null, accounts: new Map(), votedPollIds: new Set() }
 
 export function resetSession() {
   session.user = null
   session.accounts = new Map([[alice.email, PASSWORD]])
+  session.votedPollIds = new Set()
 }
 resetSession()
 
@@ -46,11 +49,24 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 })
   }),
   http.get('/api/v1/polls', () => HttpResponse.json([poll])),
+  http.post('/api/v1/polls', async ({ request }) => {
+    if (!session.user) return unauthorized()
+    const { question } = (await request.json()) as NewPoll
+    return HttpResponse.json({ ...poll, question }, { status: 201 })
+  }),
   http.get('/api/v1/polls/:id', ({ params }) =>
     params.id === poll.id
-      ? HttpResponse.json(poll)
+      ? HttpResponse.json({ ...poll, has_voted: session.votedPollIds.has(poll.id) })
       : HttpResponse.json({ detail: 'poll not found' }, { status: 404 }),
   ),
+  http.post('/api/v1/polls/:id/votes', ({ params }) => {
+    if (!session.user) return unauthorized()
+    if (session.votedPollIds.has(String(params.id))) {
+      return HttpResponse.json({ detail: 'already voted on this poll' }, { status: 409 })
+    }
+    session.votedPollIds.add(String(params.id))
+    return new HttpResponse(null, { status: 204 })
+  }),
   http.get('/api/v1/polls/:id/results', () => HttpResponse.json(results)),
 ]
 

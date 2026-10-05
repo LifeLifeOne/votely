@@ -16,7 +16,10 @@ export function Layout() {
         <nav className="nav" aria-label="Account">
           {user ? (
             <>
-              <span className="meta">{user.email}</span>
+              <Link to="/polls/new" className="button">
+                New poll
+              </Link>
+              <span className="meta user-email">{user.email}</span>
               <button
                 type="button"
                 className="secondary"

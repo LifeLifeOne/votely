@@ -31,7 +31,7 @@ it('shows an empty state', async () => {
 
   renderApp('/')
 
-  expect(await screen.findByText('No polls yet.')).toBeInTheDocument()
+  expect(await screen.findByText(/no polls yet/i)).toBeInTheDocument()
 })
 
 it('shows API errors', async () => {

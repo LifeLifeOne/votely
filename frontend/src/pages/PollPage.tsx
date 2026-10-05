@@ -5,6 +5,7 @@ import { ApiError } from '../api/client'
 import { getPoll, getResults } from '../api/polls'
 import { ResultsChart } from '../components/ResultsChart'
 import { ErrorMessage, Loading } from '../components/Status'
+import { VoteForm } from '../components/VoteForm'
 
 // Results are refreshed periodically so votes from other users show up without reloading.
 export const RESULTS_REFRESH_MS = 5000
@@ -30,7 +31,7 @@ export function PollPage() {
   return (
     <article className="card">
       <h1>{poll.data.question}</h1>
-      {poll.data.is_closed && <span className="badge">Closed</span>}
+      <VoteForm poll={poll.data} />
       {results.data && <ResultsChart results={results.data} />}
     </article>
   )

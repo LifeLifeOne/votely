@@ -14,7 +14,9 @@ export function PollListPage() {
     <>
       <h1>Polls</h1>
       {polls.data.length === 0 ? (
-        <p className="meta">No polls yet.</p>
+        <p className="meta">
+          No polls yet. <Link to="/polls/new">Create the first one</Link>.
+        </p>
       ) : (
         <ul className="stack plain-list">
           {polls.data.map((poll) => (
