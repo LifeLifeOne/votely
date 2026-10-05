@@ -1,7 +1,20 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { BrowserRouter } from 'react-router'
+
+import { AppRoutes } from './AppRoutes'
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 10_000, retry: 1 },
+  },
+})
+
 export default function App() {
   return (
-    <main className="container">
-      <h1>Votely</h1>
-    </main>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </QueryClientProvider>
   )
 }
