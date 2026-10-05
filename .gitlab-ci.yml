@@ -16,6 +16,7 @@ workflow:
 stages:
   - lint
   - test
+  - build
 
 default:
   interruptible: true
@@ -25,6 +26,7 @@ default:
     when: [runner_system_failure, scheduler_failure, api_failure]
 
 include:
+  - local: .gitlab/ci/templates.gitlab-ci.yml
   - local: .gitlab/ci/backend.gitlab-ci.yml
   - local: .gitlab/ci/frontend.gitlab-ci.yml
   - local: .gitlab/ci/e2e.gitlab-ci.yml

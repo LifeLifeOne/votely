@@ -10,6 +10,7 @@ Votely est construit et testé par GitLab CI à chaque merge request et à chaqu
 ```
 .gitlab-ci.yml                  # point d'entrée : workflow, stages, valeurs par défaut, includes
 .gitlab/ci/
+├── templates.gitlab-ci.yml     # briques communes (build Docker, règles)
 ├── backend.gitlab-ci.yml       # jobs backend:*
 ├── frontend.gitlab-ci.yml      # jobs frontend:*
 └── e2e.gitlab-ci.yml           # jobs e2e:*
@@ -50,12 +51,35 @@ ou un lint en échec.
 | | `e2e:lint` | Prettier, TypeScript |
 | `test` | `backend:test` | pytest : tests unitaires et d'intégration face à un service PostgreSQL 16, migrations comprises ; couverture ≥ 90 % |
 | | `frontend:test` | Vitest : composants et pages face à une fausse API (MSW) ; couverture ≥ 80 % des lignes |
+| `build` | `backend:build`, `frontend:build` | Images de production construites et poussées dans le registry de conteneurs GitLab |
 
 Chaque job de test n'attend que le lint de son propre composant (`needs`) : un lint frontend lent
 ne retarde jamais les tests du backend.
 
 `backend:test` tourne avec `CI=true` (toujours défini par GitLab) : si PostgreSQL était
 injoignable, les tests d'intégration échoueraient au lieu d'être ignorés comme en local.
+
+## Images de conteneurs
+
+Les images sont poussées dans le registry de conteneurs du projet :
+`registry.gitlab.com/stateofflowhunter/votely/<composant>:<SHA du commit>`.
+
+- **Tags immuables** : le SHA complet du commit identifie exactement ce qui a été construit. Les
+  tags de déploiement (`main`, versions) sont ajoutés plus tard, une fois les images testées.
+- **Jamais sans tests** : chaque job de build dépend (`needs`) des tests de son composant ; un
+  test en échec empêche la publication de l'image.
+- **Les deux images, ou aucune** : les builds tournent dès qu'un chemin applicatif change
+  (`.rules:app`), pour que les tests end-to-end utilisent toujours un backend et un frontend du
+  même commit. Reconstruire une image inchangée est rapide grâce au cache des couches.
+- **Cache des couches dans le registry** (`:buildcache`, BuildKit `mode=max`) : écrit uniquement
+  par la branche principale, lu par tous les pipelines.
+- **Traçabilité** : des labels OCI enregistrent le dépôt source, le commit et la date de build.
+- **Digest transmis aux jobs suivants** : chaque build exporte `BACKEND_IMAGE` /
+  `FRONTEND_IMAGE` (`…@sha256:…`) en artefact dotenv ; les jobs suivants utilisent exactement
+  l'image construite, pas un tag qui pourrait bouger.
+
+Les builds utilisent Docker-in-Docker avec BuildKit (`docker buildx`), la configuration standard
+sur les runners partagés de GitLab.com.
 
 ## Rapports
 

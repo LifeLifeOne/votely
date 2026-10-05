@@ -10,6 +10,7 @@ Pipelines: https://gitlab.com/StateOfFlowHunter/votely/-/pipelines
 ```
 .gitlab-ci.yml                  # entry point: workflow, stages, defaults, includes
 .gitlab/ci/
+├── templates.gitlab-ci.yml     # shared building blocks (Docker build, rules)
 ├── backend.gitlab-ci.yml       # backend:* jobs
 ├── frontend.gitlab-ci.yml      # frontend:* jobs
 └── e2e.gitlab-ci.yml           # e2e:* jobs
@@ -47,12 +48,35 @@ retried once on infrastructure failures only, never on a failing test or lint.
 | | `e2e:lint` | Prettier, TypeScript |
 | `test` | `backend:test` | pytest: unit and integration tests against a PostgreSQL 16 service, migrations included; coverage ≥ 90 % |
 | | `frontend:test` | Vitest: components and pages against a fake API (MSW); coverage ≥ 80 % of lines |
+| `build` | `backend:build`, `frontend:build` | Production images built and pushed to the GitLab container registry |
 
 Each test job only waits for the lint job of its own component (`needs`), so a slow frontend lint
 never delays the backend tests.
 
 `backend:test` sets `CI=true` (always defined by GitLab): if PostgreSQL were unreachable, the
 integration tests would fail instead of being skipped as they are locally.
+
+## Container images
+
+Images are pushed to the project's container registry:
+`registry.gitlab.com/stateofflowhunter/votely/<component>:<commit SHA>`.
+
+- **Immutable tags**: the full commit SHA identifies exactly what was built. Deployment tags
+  (`main`, versions) are added later, after the images have been tested.
+- **Never untested**: each build job `needs` the tests of its component, so a failing test stops
+  the image from being published.
+- **Both images, or none**: build jobs run when any application path changes (`.rules:app`), so
+  the end-to-end tests always run a backend and a frontend from the same commit. Rebuilding an
+  unchanged image is fast thanks to the layer cache.
+- **Layer cache in the registry** (`:buildcache`, BuildKit `mode=max`): written by the default
+  branch only, read by every pipeline.
+- **Traceability**: OCI labels record the source repository, the commit and the build date.
+- **Digest handed to later jobs**: each build exports `BACKEND_IMAGE` / `FRONTEND_IMAGE`
+  (`…@sha256:…`) as a dotenv artifact, so later jobs use exactly the image that was built, not a
+  tag that could move.
+
+Builds use Docker-in-Docker with BuildKit (`docker buildx`), the standard setup on GitLab.com
+shared runners.
 
 ## Reports
 
