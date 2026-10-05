@@ -11,6 +11,7 @@ Votely est une application de sondages légère : créer un sondage, le partager
 | Frontend | React 19 · TypeScript · Vite · TanStack Query |
 | Backend | Python 3.12 · FastAPI · SQLAlchemy 2 · Alembic |
 | Base de données | PostgreSQL 16 |
+| Conteneurs | Images Docker multi-étapes · nginx · Docker Compose |
 
 ## Organisation du dépôt
 
@@ -18,11 +19,20 @@ Votely est une application de sondages légère : créer un sondage, le partager
 .
 ├── backend/        # API REST (FastAPI)
 ├── frontend/       # Application web (React)
-├── compose.yaml    # Stack de développement local
+├── compose.yaml    # Stack complète (Docker Compose)
 └── docs/           # Documentation technique (en/, fr/)
 ```
 
 ## Démarrage
+
+### Lancer toute la stack avec Docker
+
+```bash
+cp .env.example .env          # puis définir un mot de passe de base et un secret JWT (openssl rand -hex 32)
+docker compose up --build     # http://localhost:8080
+```
+
+### Développement local
 
 Prérequis : Docker, [mise](https://mise.jdx.dev/) (installe Python 3.12, uv et Node.js 24).
 
@@ -35,7 +45,7 @@ cd backend
 uv sync
 set -a && . ../.env && set +a
 uv run alembic upgrade head   # création du schéma
-uv run fastapi dev app/main.py
+uv run uvicorn app.main:app --reload
 ```
 
 Dans un autre terminal :
@@ -70,6 +80,7 @@ uvx pre-commit install  # hooks git (lint + détection de secrets)
 
 - [Backend](docs/fr/BACK.md) : architecture, authentification, API, modèle de données, migrations, tests
 - [Frontend](docs/fr/FRONT.md) : architecture, communication avec l'API, expérience utilisateur, tests
+- [Conteneurs](docs/fr/CONTAINERS.md) : images, stack Docker Compose, durcissement, scans
 
 ## Licence
 

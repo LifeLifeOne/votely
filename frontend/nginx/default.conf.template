@@ -1,0 +1,46 @@
+# Votely frontend: static single-page application + reverse proxy to the API.
+# ${VOTELY_API_UPSTREAM} is substituted when the container starts.
+
+server {
+    listen 8080;
+    server_name _;
+    root /usr/share/nginx/html;
+
+    server_tokens off;
+    client_max_body_size 1m;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+
+    # Container liveness, independent from the API.
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    # Same origin for the browser: /api is forwarded to the backend.
+    location /api/ {
+        proxy_pass ${VOTELY_API_UPSTREAM};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        include /etc/nginx/snippets/security-headers.conf;
+    }
+
+    # Fingerprinted build assets (index-<hash>.js) never change: cache them for a year.
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        include /etc/nginx/snippets/security-headers.conf;
+        try_files $uri =404;
+    }
+
+    # Client-side routes (/polls/42, /login...) all serve index.html, never cached,
+    # so a new deployment is picked up on the next page load.
+    location / {
+        add_header Cache-Control "no-cache" always;
+        include /etc/nginx/snippets/security-headers.conf;
+        try_files $uri $uri/ /index.html;
+    }
+}
