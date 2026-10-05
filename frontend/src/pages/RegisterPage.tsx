@@ -21,7 +21,7 @@ export function RegisterPage() {
   }
 
   return (
-    <section className="card">
+    <section className="card auth-card">
       <h1>Create an account</h1>
       <form onSubmit={handleSubmit}>
         <label>
@@ -50,7 +50,7 @@ export function RegisterPage() {
           Sign up
         </button>
       </form>
-      <p className="meta">
+      <p className="meta form-footer">
         Already registered? <Link to="/login">Log in</Link>
       </p>
     </section>

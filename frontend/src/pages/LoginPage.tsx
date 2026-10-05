@@ -20,7 +20,7 @@ export function LoginPage() {
   }
 
   return (
-    <section className="card">
+    <section className="card auth-card">
       <h1>Log in</h1>
       <form onSubmit={handleSubmit}>
         <label>
@@ -36,7 +36,7 @@ export function LoginPage() {
           Log in
         </button>
       </form>
-      <p className="meta">
+      <p className="meta form-footer">
         No account yet? <Link to="/register">Sign up</Link>
       </p>
     </section>

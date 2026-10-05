@@ -12,22 +12,44 @@ export function PollListPage() {
 
   return (
     <>
-      <h1>Polls</h1>
+      <header className="page-header">
+        <div>
+          <h1>Polls</h1>
+          <p className="meta">Vote on open questions and follow the results live.</p>
+        </div>
+        {/* Anonymous visitors are sent to the login page first (RequireAuth). */}
+        <Link to="/polls/new" className="button">
+          New poll
+        </Link>
+      </header>
       {polls.data.length === 0 ? (
-        <p className="meta">
-          No polls yet. <Link to="/polls/new">Create the first one</Link>.
-        </p>
+        <div className="card empty">
+          <p className="meta">
+            No polls yet. <Link to="/polls/new">Create the first one</Link>.
+          </p>
+        </div>
       ) : (
         <ul className="stack plain-list">
           {polls.data.map((poll) => (
             <li key={poll.id}>
               <Link to={`/polls/${poll.id}`} className="card poll-link">
-                <strong>{poll.question}</strong>
-                <div className="meta">
-                  {poll.options.length} options · {new Date(poll.created_at).toLocaleDateString()}{' '}
-                  {poll.is_closed && <span className="badge">Closed</span>}{' '}
-                  {poll.has_voted && <span className="badge">Voted</span>}
+                <div>
+                  <span className="poll-question">{poll.question}</span>
+                  <span className="meta">
+                    {poll.options.length} options · {new Date(poll.created_at).toLocaleDateString()}
+                  </span>
+                  <span className="badges">
+                    {poll.is_closed ? (
+                      <span className="badge closed">Closed</span>
+                    ) : (
+                      <span className="badge open">Open</span>
+                    )}
+                    {poll.has_voted && <span className="badge">Voted</span>}
+                  </span>
                 </div>
+                <span className="poll-arrow" aria-hidden="true">
+                  →
+                </span>
               </Link>
             </li>
           ))}

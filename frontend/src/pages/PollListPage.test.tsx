@@ -13,6 +13,15 @@ it('lists polls with a link to each of them', async () => {
   expect(link).toHaveAttribute('href', `/polls/${poll.id}`)
 })
 
+it('offers to create a new poll', async () => {
+  renderApp('/')
+
+  expect(await screen.findByRole('link', { name: 'New poll' })).toHaveAttribute(
+    'href',
+    '/polls/new',
+  )
+})
+
 it('shows closed and already voted polls', async () => {
   server.use(
     http.get('/api/v1/polls', () =>

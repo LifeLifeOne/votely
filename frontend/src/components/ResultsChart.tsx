@@ -1,17 +1,25 @@
 import type { PollResults } from '../api/types'
 
 export function ResultsChart({ results }: { results: PollResults }) {
+  const topVotes = Math.max(...results.options.map((option) => option.votes))
+
   return (
-    <section className="results" aria-label="Results">
-      <p className="meta">
-        {results.total_votes} {results.total_votes === 1 ? 'vote' : 'votes'}
-      </p>
+    <section className="results" aria-labelledby="results-title">
+      <h2 id="results-title">
+        Results
+        <span className="meta">
+          {results.total_votes} {results.total_votes === 1 ? 'vote' : 'votes'}
+        </span>
+      </h2>
       {results.options.map((option) => (
-        <div key={option.option_id}>
+        <div
+          key={option.option_id}
+          className={option.votes > 0 && option.votes === topVotes ? 'leader' : undefined}
+        >
           <div className="result-label">
             <span>{option.label}</span>
-            <span className="meta">
-              {option.percentage}% · {option.votes}
+            <span className="result-value">
+              {option.percentage}% <span className="meta">· {option.votes}</span>
             </span>
           </div>
           <div

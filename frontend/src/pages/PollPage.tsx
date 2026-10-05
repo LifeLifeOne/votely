@@ -31,6 +31,16 @@ export function PollPage() {
   return (
     <article className="card">
       <h1>{poll.data.question}</h1>
+      <p className="poll-status meta">
+        {poll.data.is_closed ? (
+          <span className="badge closed">Closed</span>
+        ) : (
+          <span className="badge open">Open</span>
+        )}
+        {poll.data.closes_at && !poll.data.is_closed && (
+          <span>Closes on {new Date(poll.data.closes_at).toLocaleString()}</span>
+        )}
+      </p>
       <VoteForm poll={poll.data} />
       {results.data && <ResultsChart results={results.data} />}
     </article>

@@ -1,6 +1,7 @@
 import { Link, Outlet, useNavigate } from 'react-router'
 
 import { useCurrentUser, useLogout } from '../auth/hooks'
+import { Logo } from './Logo'
 
 export function Layout() {
   const { data: user } = useCurrentUser()
@@ -11,14 +12,12 @@ export function Layout() {
     <div className="container">
       <header className="header">
         <Link to="/" className="brand">
+          <Logo />
           Votely
         </Link>
         <nav className="nav" aria-label="Account">
           {user ? (
             <>
-              <Link to="/polls/new" className="button">
-                New poll
-              </Link>
               <span className="meta user-email">{user.email}</span>
               <button
                 type="button"
