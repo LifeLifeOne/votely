@@ -2,7 +2,7 @@
 
 [🇫🇷 Version française](README.fr.md)
 
-Votely is a lightweight polling application: create a poll, share it, collect votes and follow the results live.
+Votely is a lightweight polling application: create a poll, share it, collect votes (one per account) and follow the results live.
 
 ## Stack
 
@@ -26,7 +26,7 @@ Prerequisites: Docker, [mise](https://mise.jdx.dev/) (installs Python 3.12 and u
 
 ```bash
 mise install                  # Python + uv versions pinned in .mise.toml
-cp .env.example .env          # then set your own local password
+cp .env.example .env          # then set a local password and a JWT secret (openssl rand -hex 32)
 docker compose up -d db       # PostgreSQL on localhost:5432
 
 cd backend
@@ -51,7 +51,7 @@ uvx pre-commit install  # git hooks (lint + secret scanning)
 
 ## Documentation
 
-- [Backend](docs/BACK.md): architecture, API, data model, migrations, tests
+- [Backend](docs/BACK.md): architecture, authentication, API, data model, migrations, tests
 
 ## License
 

@@ -2,7 +2,7 @@
 
 [🇬🇧 English version](README.md)
 
-Votely est une application de sondages légère : créer un sondage, le partager, recueillir des votes et suivre les résultats en direct.
+Votely est une application de sondages légère : créer un sondage, le partager, recueillir des votes (un par compte) et suivre les résultats en direct.
 
 ## Stack
 
@@ -26,7 +26,7 @@ Prérequis : Docker, [mise](https://mise.jdx.dev/) (installe Python 3.12 et uv).
 
 ```bash
 mise install                  # versions de Python et uv fixées dans .mise.toml
-cp .env.example .env          # puis définir son propre mot de passe local
+cp .env.example .env          # puis définir un mot de passe local et un secret JWT (openssl rand -hex 32)
 docker compose up -d db       # PostgreSQL sur localhost:5432
 
 cd backend
@@ -51,7 +51,7 @@ uvx pre-commit install  # hooks git (lint + détection de secrets)
 
 ## Documentation
 
-- [Backend](docs/BACK.md) : architecture, API, modèle de données, migrations, tests (en anglais)
+- [Backend](docs/BACK.md) : architecture, authentification, API, modèle de données, migrations, tests (en anglais)
 
 ## Licence
 
