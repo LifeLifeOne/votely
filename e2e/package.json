@@ -1,0 +1,26 @@
+{
+  "name": "votely-e2e",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "stack:up": "docker compose -p votely-e2e -f ../compose.yaml -f ../compose.e2e.yaml up -d --build --wait",
+    "stack:down": "docker compose -p votely-e2e -f ../compose.yaml -f ../compose.e2e.yaml down -v",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "SLOW_MO=${SLOW_MO:-1500} playwright test --headed --workers=1 --project=desktop",
+    "test:debug": "playwright test --debug --project=desktop",
+    "report": "playwright show-report",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^24.19.1",
+    "prettier": "^3.9.9",
+    "typescript": "~6.0.2"
+  }
+}
