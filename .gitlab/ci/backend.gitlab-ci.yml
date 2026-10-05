@@ -1,0 +1,30 @@
+# Backend (FastAPI): python + uv, dependencies resolved from backend/uv.lock.
+
+.backend:
+  image: ghcr.io/astral-sh/uv:0.12-python3.12-trixie-slim
+  variables:
+    UV_CACHE_DIR: $CI_PROJECT_DIR/.cache/uv
+    UV_LINK_MODE: copy
+    UV_FROZEN: "1" # never update the lockfile in CI
+  cache:
+    key:
+      prefix: backend
+      files: [backend/uv.lock]
+    paths: [.cache/uv]
+  before_script:
+    - cd backend
+  rules:
+    # Merge requests: only when the backend or its pipeline changed. Default branch and tags: always.
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - backend/**/*
+        - .gitlab-ci.yml
+        - .gitlab/ci/backend.gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE != "merge_request_event"
+
+backend:lint:
+  extends: .backend
+  stage: lint
+  script:
+    - uv run ruff check .
+    - uv run ruff format --check .

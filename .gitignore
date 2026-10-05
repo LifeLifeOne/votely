@@ -34,3 +34,7 @@ kubeconfig*
 .idea/
 .vscode/
 .DS_Store
+
+# CI caches
+.cache/
+.npm/
