@@ -80,6 +80,29 @@ def test_votes_are_counted_in_results(auth_client, login_as):
     ]
 
 
+def test_a_user_can_only_vote_once_per_poll(auth_client):
+    poll = create_poll(auth_client)
+    assert vote(auth_client, poll, 0).status_code == 204
+
+    response = vote(auth_client, poll, 1)
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "already voted on this poll"}
+    assert auth_client.get(f"/api/v1/polls/{poll['id']}/results").json()["total_votes"] == 1
+
+
+def test_has_voted_reflects_the_current_user(auth_client, login_as, client):
+    poll = create_poll(auth_client)
+    vote(auth_client, poll)
+    bob = login_as("bob@example.com")
+    url = f"/api/v1/polls/{poll['id']}"
+
+    assert auth_client.get(url).json()["has_voted"] is True
+    assert auth_client.get("/api/v1/polls").json()[0]["has_voted"] is True
+    assert bob.get(url).json()["has_voted"] is False
+    assert client.get(url).json()["has_voted"] is False
+
+
 def test_unknown_poll_returns_404(client):
     response = client.get(f"/api/v1/polls/{uuid.uuid4()}")
 

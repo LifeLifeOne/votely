@@ -19,7 +19,8 @@ class PollRepository(Protocol):
     def add(self, poll: Poll) -> Poll: ...
     def get(self, poll_id: uuid.UUID) -> Poll | None: ...
     def list_recent(self, limit: int, offset: int) -> list[Poll]: ...
-    def add_vote(self, option_id: uuid.UUID) -> None: ...
+    def add_vote(self, poll_id: uuid.UUID, option_id: uuid.UUID, user_id: uuid.UUID) -> None: ...
+    def voted_poll_ids(self, user_id: uuid.UUID, poll_ids: list[uuid.UUID]) -> set[uuid.UUID]: ...
     def count_votes(self, poll_id: uuid.UUID) -> dict[uuid.UUID, int]: ...
 
 
@@ -79,13 +80,20 @@ class PollService:
             raise PollNotFoundError()
         return poll
 
-    def vote(self, poll_id: uuid.UUID, option_id: uuid.UUID) -> None:
+    def vote(self, poll_id: uuid.UUID, option_id: uuid.UUID, user_id: uuid.UUID) -> None:
         poll = self.get_poll(poll_id)
         if is_closed(poll, self._clock()):
             raise PollClosedError()
         if option_id not in {option.id for option in poll.options}:
             raise OptionNotFoundError()
-        self._repository.add_vote(option_id)
+        # A second vote is rejected by the repository (AlreadyVotedError).
+        self._repository.add_vote(poll_id, option_id, user_id)
+
+    def voted_poll_ids(self, user_id: uuid.UUID | None, polls: list[Poll]) -> set[uuid.UUID]:
+        """Ids of the given polls the user has already voted on (none for anonymous users)."""
+        if user_id is None or not polls:
+            return set()
+        return self._repository.voted_poll_ids(user_id, [poll.id for poll in polls])
 
     def get_results(self, poll_id: uuid.UUID) -> PollResults:
         poll = self.get_poll(poll_id)

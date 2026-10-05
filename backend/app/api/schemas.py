@@ -63,6 +63,8 @@ class PollRead(BaseModel):
     closes_at: datetime | None
     created_at: datetime
     is_closed: bool
+    # Whether the current user already voted (always false for anonymous users).
+    has_voted: bool
     options: list[OptionRead]
 
 

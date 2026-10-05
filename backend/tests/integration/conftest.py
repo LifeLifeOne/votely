@@ -38,6 +38,12 @@ def ensure_database_exists(url: str) -> None:
     admin.dispose()
 
 
+def alembic_config(url: str) -> Config:
+    config = Config(str(BACKEND_DIR / "alembic.ini"))
+    config.set_main_option("sqlalchemy.url", url.replace("%", "%%"))
+    return config
+
+
 @pytest.fixture(scope="session")
 def engine() -> Iterator[Engine]:
     url = resolve_test_database_url()
@@ -50,9 +56,7 @@ def engine() -> Iterator[Engine]:
         pytest.skip(f"PostgreSQL unavailable, start it with 'docker compose up -d db' ({exc})")
 
     # Build the schema through the real migrations, so they are tested too.
-    config = Config(str(BACKEND_DIR / "alembic.ini"))
-    config.set_main_option("sqlalchemy.url", url.replace("%", "%%"))
-    command.upgrade(config, "head")
+    command.upgrade(alembic_config(url), "head")
 
     engine = create_engine(url)
     yield engine

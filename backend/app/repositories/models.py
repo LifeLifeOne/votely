@@ -66,8 +66,13 @@ class Option(Base):
 
 class Vote(Base):
     __tablename__ = "votes"
+    # One vote per user and poll, enforced by the database even under concurrent requests.
+    __table_args__ = (UniqueConstraint("poll_id", "user_id"),)
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    poll_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("polls.id", ondelete="CASCADE"))
+    # Nullable: votes cast before accounts existed are kept, but have no voter.
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     option_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("options.id", ondelete="CASCADE"), index=True
     )

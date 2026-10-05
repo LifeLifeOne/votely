@@ -17,6 +17,11 @@ class PollClosedError(DomainError):
         super().__init__("poll is closed")
 
 
+class AlreadyVotedError(DomainError):
+    def __init__(self) -> None:
+        super().__init__("already voted on this poll")
+
+
 class InvalidClosingDateError(DomainError):
     def __init__(self) -> None:
         super().__init__("closing date must be in the future")
