@@ -20,3 +20,13 @@ class PollClosedError(DomainError):
 class InvalidClosingDateError(DomainError):
     def __init__(self) -> None:
         super().__init__("closing date must be in the future")
+
+
+class EmailAlreadyRegisteredError(DomainError):
+    def __init__(self) -> None:
+        super().__init__("email already registered")
+
+
+class InvalidCredentialsError(DomainError):
+    def __init__(self) -> None:
+        super().__init__("invalid email or password")

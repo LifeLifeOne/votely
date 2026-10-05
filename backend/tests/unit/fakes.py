@@ -1,7 +1,8 @@
 import uuid
 from datetime import UTC, datetime
 
-from app.repositories.models import Poll
+from app.domain.errors import EmailAlreadyRegisteredError
+from app.repositories.models import Poll, User
 
 
 class InMemoryPollRepository:
@@ -37,3 +38,22 @@ class InMemoryPollRepository:
             if option_id in option_ids:
                 counts[option_id] = counts.get(option_id, 0) + 1
         return counts
+
+
+class InMemoryUserRepository:
+    def __init__(self) -> None:
+        self.users: dict[uuid.UUID, User] = {}
+
+    def add(self, user: User) -> User:
+        if self.get_by_email(user.email) is not None:
+            raise EmailAlreadyRegisteredError()
+        user.id = uuid.uuid4()
+        user.created_at = datetime.now(UTC)
+        self.users[user.id] = user
+        return user
+
+    def get(self, user_id: uuid.UUID) -> User | None:
+        return self.users.get(user_id)
+
+    def get_by_email(self, email: str) -> User | None:
+        return next((u for u in self.users.values() if u.email == email), None)
