@@ -1,0 +1,27 @@
+# End-to-end tests (Playwright): linted here, run against the full stack in a later stage.
+
+.e2e:
+  image: node:24-alpine
+  cache:
+    key:
+      prefix: e2e
+      files: [e2e/package-lock.json]
+    paths: [.npm]
+  before_script:
+    - cd e2e
+    - npm ci --cache ../.npm --prefer-offline --no-audit --no-fund
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - e2e/**/*
+        - compose*.yaml
+        - .gitlab-ci.yml
+        - .gitlab/ci/e2e.gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE != "merge_request_event"
+
+e2e:lint:
+  extends: .e2e
+  stage: lint
+  script:
+    - npm run format:check
+    - npm run typecheck

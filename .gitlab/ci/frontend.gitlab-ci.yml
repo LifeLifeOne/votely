@@ -1,0 +1,27 @@
+# Frontend (React + Vite): node, dependencies installed from frontend/package-lock.json.
+
+.frontend:
+  image: node:24-alpine
+  cache:
+    key:
+      prefix: frontend
+      files: [frontend/package-lock.json]
+    paths: [.npm]
+  before_script:
+    - cd frontend
+    - npm ci --cache ../.npm --prefer-offline --no-audit --no-fund
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - frontend/**/*
+        - .gitlab-ci.yml
+        - .gitlab/ci/frontend.gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE != "merge_request_event"
+
+frontend:lint:
+  extends: .frontend
+  stage: lint
+  script:
+    - npm run lint
+    - npm run format:check
+    - npm run typecheck
