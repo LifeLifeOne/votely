@@ -45,6 +45,24 @@ retried once on infrastructure failures only, never on a failing test or lint.
 | `lint` | `backend:lint` | ruff (lint rules, import order) and ruff format |
 | | `frontend:lint` | oxlint (warnings fail the job), Prettier, TypeScript |
 | | `e2e:lint` | Prettier, TypeScript |
+| `test` | `backend:test` | pytest: unit and integration tests against a PostgreSQL 16 service, migrations included; coverage ≥ 90 % |
+| | `frontend:test` | Vitest: components and pages against a fake API (MSW); coverage ≥ 80 % of lines |
+
+Each test job only waits for the lint job of its own component (`needs`), so a slow frontend lint
+never delays the backend tests.
+
+`backend:test` sets `CI=true` (always defined by GitLab): if PostgreSQL were unreachable, the
+integration tests would fail instead of being skipped as they are locally.
+
+## Reports
+
+| Report | Where it shows up |
+|---|---|
+| JUnit (`junit.xml`) | *Tests* tab of the pipeline, and the merge request widget (new and fixed failures) |
+| Coverage percentage | Merge request widget and job list, extracted from the job log |
+| Cobertura (`coverage.xml`) | Covered and uncovered lines highlighted in the merge request diff |
+
+Reports are uploaded even when tests fail (`when: always`) and kept one week.
 
 ## Caching
 
