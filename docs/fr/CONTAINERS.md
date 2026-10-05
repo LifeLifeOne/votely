@@ -69,7 +69,7 @@ conteneur pour l'application (voir le [README](../../README.fr.md)).
 
 | Chemin | Comportement |
 |---|---|
-| `/api/` | Reverse proxy vers le backend (même origine pour le navigateur) |
+| `/api/` | Reverse proxy vers le backend (même origine pour le navigateur). Le nom d'hôte est re-résolu toutes les 10 s : un backend redémarré avec une nouvelle IP est retrouvé ; un backend injoignable échoue vite avec `502` (connexion limitée à 5 s) |
 | `/assets/` | Fichiers avec empreinte, en cache un an (`immutable`), gzip |
 | `/healthz` | Liveness du conteneur |
 | tout le reste | `index.html` (routes côté client), `no-cache` pour prendre en compte les déploiements |

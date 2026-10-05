@@ -12,15 +12,18 @@ Votely is a lightweight polling application: create a poll, share it, collect vo
 | Backend | Python 3.12 · FastAPI · SQLAlchemy 2 · Alembic |
 | Database | PostgreSQL 16 |
 | Containers | Docker multi-stage images · nginx · Docker Compose |
+| Tests | pytest · Vitest · Testing Library · MSW · Playwright |
 
 ## Repository layout
 
 ```
 .
-├── backend/        # REST API (FastAPI)
-├── frontend/       # Web application (React)
-├── compose.yaml    # Full stack (Docker Compose)
-└── docs/           # Technical documentation (en/, fr/)
+├── backend/          # REST API (FastAPI)
+├── e2e/              # End-to-end tests (Playwright)
+├── frontend/         # Web application (React)
+├── compose.yaml      # Full stack (Docker Compose)
+├── compose.e2e.yaml  # Disposable stack for end-to-end tests
+└── docs/             # Technical documentation (en/, fr/)
 ```
 
 ## Getting started
@@ -68,10 +71,18 @@ uv run pytest           # tests
 uv run ruff check .     # lint
 uv run ruff format .    # format
 
-cd frontend
+cd ../frontend
 npm test                # tests
 npm run lint            # lint
 npm run format          # format
+
+cd ../e2e
+npm run stack:up        # disposable stack for the tests (http://localhost:8081)
+npm test                # end-to-end tests
+npm run test:ui         # explore them in the Playwright UI
+npm run test:headed     # watch them live in a browser, slowed down
+npm run test:debug      # step through them action by action
+npm run stack:down      # remove the test stack and its data
 
 uvx pre-commit install  # git hooks (lint + secret scanning)
 ```
@@ -81,6 +92,7 @@ uvx pre-commit install  # git hooks (lint + secret scanning)
 - [Backend](docs/en/BACK.md): architecture, authentication, API, data model, migrations, tests
 - [Frontend](docs/en/FRONT.md): architecture, API communication, user experience, tests
 - [Containers](docs/en/CONTAINERS.md): images, Docker Compose stack, hardening, scans
+- [Tests](docs/en/TESTS.md): testing strategy, end-to-end tests, how to watch them
 
 ## License
 

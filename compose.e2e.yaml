@@ -1,0 +1,14 @@
+# Disposable stack for end-to-end tests, layered on top of compose.yaml:
+#   docker compose -p votely-e2e -f compose.yaml -f compose.e2e.yaml up -d --build --wait
+# Own project name (containers, network), own port, database in memory: tests never touch
+# development data and everything disappears with `down`.
+services:
+  db:
+    ports: !reset []
+    volumes: !reset []
+    tmpfs:
+      - /var/lib/postgresql/data
+
+  frontend:
+    ports: !override
+      - "127.0.0.1:${VOTELY_E2E_HTTP_PORT:-8081}:8080"

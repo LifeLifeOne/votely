@@ -6,7 +6,8 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
-        args: [--allow-multiple-documents]
+        # --unsafe: syntax check only, so Compose tags (!reset, !override) are accepted.
+        args: [--allow-multiple-documents, --unsafe]
       - id: check-added-large-files
       - id: detect-private-key
 

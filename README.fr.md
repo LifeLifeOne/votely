@@ -12,15 +12,18 @@ Votely est une application de sondages légère : créer un sondage, le partager
 | Backend | Python 3.12 · FastAPI · SQLAlchemy 2 · Alembic |
 | Base de données | PostgreSQL 16 |
 | Conteneurs | Images Docker multi-étapes · nginx · Docker Compose |
+| Tests | pytest · Vitest · Testing Library · MSW · Playwright |
 
 ## Organisation du dépôt
 
 ```
 .
-├── backend/        # API REST (FastAPI)
-├── frontend/       # Application web (React)
-├── compose.yaml    # Stack complète (Docker Compose)
-└── docs/           # Documentation technique (en/, fr/)
+├── backend/          # API REST (FastAPI)
+├── e2e/              # Tests end-to-end (Playwright)
+├── frontend/         # Application web (React)
+├── compose.yaml      # Stack complète (Docker Compose)
+├── compose.e2e.yaml  # Stack jetable pour les tests end-to-end
+└── docs/             # Documentation technique (en/, fr/)
 ```
 
 ## Démarrage
@@ -68,10 +71,18 @@ uv run pytest           # tests
 uv run ruff check .     # lint
 uv run ruff format .    # formatage
 
-cd frontend
+cd ../frontend
 npm test                # tests
 npm run lint            # lint
 npm run format          # formatage
+
+cd ../e2e
+npm run stack:up        # stack jetable pour les tests (http://localhost:8081)
+npm test                # tests end-to-end
+npm run test:ui         # les explorer dans l'interface Playwright
+npm run test:headed     # les regarder en direct dans un navigateur, au ralenti
+npm run test:debug      # les exécuter action par action
+npm run stack:down      # supprime la stack de test et ses données
 
 uvx pre-commit install  # hooks git (lint + détection de secrets)
 ```
@@ -81,6 +92,7 @@ uvx pre-commit install  # hooks git (lint + détection de secrets)
 - [Backend](docs/fr/BACK.md) : architecture, authentification, API, modèle de données, migrations, tests
 - [Frontend](docs/fr/FRONT.md) : architecture, communication avec l'API, expérience utilisateur, tests
 - [Conteneurs](docs/fr/CONTAINERS.md) : images, stack Docker Compose, durcissement, scans
+- [Tests](docs/fr/TESTS.md) : stratégie de test, tests end-to-end, comment les regarder
 
 ## Licence
 
