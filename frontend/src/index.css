@@ -162,6 +162,11 @@ a:focus-visible {
   outline-offset: 2px;
 }
 
+.field {
+  display: grid;
+  gap: 6px;
+}
+
 fieldset {
   display: grid;
   gap: 8px;

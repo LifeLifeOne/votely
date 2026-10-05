@@ -1,5 +1,7 @@
 import type { Poll, PollResults, User } from '../api/types'
 
+export const PASSWORD = 'correct horse battery'
+
 export const alice: User = {
   id: '6f1c1d8e-0000-4000-8000-000000000001',
   email: 'alice@example.com',
