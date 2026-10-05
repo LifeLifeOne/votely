@@ -58,6 +58,7 @@ class PollRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    author_id: uuid.UUID | None
     question: str
     closes_at: datetime | None
     created_at: datetime

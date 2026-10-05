@@ -55,7 +55,11 @@ class PollService:
         self._clock = clock
 
     def create_poll(
-        self, question: str, option_labels: list[str], closes_at: datetime | None = None
+        self,
+        question: str,
+        option_labels: list[str],
+        author_id: uuid.UUID,
+        closes_at: datetime | None = None,
     ) -> Poll:
         if closes_at is not None and closes_at <= self._clock():
             raise InvalidClosingDateError()
@@ -63,7 +67,8 @@ class PollService:
         options = [
             Option(label=label, position=position) for position, label in enumerate(option_labels)
         ]
-        return self._repository.add(Poll(question=question, closes_at=closes_at, options=options))
+        poll = Poll(question=question, author_id=author_id, closes_at=closes_at, options=options)
+        return self._repository.add(poll)
 
     def list_polls(self, limit: int, offset: int) -> list[Poll]:
         return self._repository.list_recent(limit=limit, offset=offset)

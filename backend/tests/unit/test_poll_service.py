@@ -13,6 +13,7 @@ from app.domain.polls import PollService
 from tests.unit.fakes import InMemoryPollRepository
 
 NOW = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
+AUTHOR = uuid.uuid4()
 
 
 @pytest.fixture
@@ -25,16 +26,19 @@ def service(repository) -> PollService:
     return PollService(repository, clock=lambda: NOW)
 
 
-def test_create_poll_keeps_option_order(service):
-    poll = service.create_poll("Best editor?", ["vim", "emacs", "vscode"])
+def test_create_poll_keeps_option_order_and_author(service):
+    poll = service.create_poll("Best editor?", ["vim", "emacs", "vscode"], AUTHOR)
 
+    assert poll.author_id == AUTHOR
     assert [option.label for option in poll.options] == ["vim", "emacs", "vscode"]
     assert [option.position for option in poll.options] == [0, 1, 2]
 
 
 def test_create_poll_rejects_closing_date_in_the_past(service):
     with pytest.raises(InvalidClosingDateError):
-        service.create_poll("Best editor?", ["vim", "emacs"], closes_at=NOW - timedelta(days=1))
+        service.create_poll(
+            "Best editor?", ["vim", "emacs"], AUTHOR, closes_at=NOW - timedelta(days=1)
+        )
 
 
 def test_get_unknown_poll_raises(service):
@@ -43,7 +47,7 @@ def test_get_unknown_poll_raises(service):
 
 
 def test_vote_is_recorded(service, repository):
-    poll = service.create_poll("Best editor?", ["vim", "emacs"])
+    poll = service.create_poll("Best editor?", ["vim", "emacs"], AUTHOR)
 
     service.vote(poll.id, poll.options[0].id)
 
@@ -51,8 +55,8 @@ def test_vote_is_recorded(service, repository):
 
 
 def test_vote_with_option_from_another_poll_is_rejected(service):
-    poll = service.create_poll("Best editor?", ["vim", "emacs"])
-    other = service.create_poll("Tabs or spaces?", ["tabs", "spaces"])
+    poll = service.create_poll("Best editor?", ["vim", "emacs"], AUTHOR)
+    other = service.create_poll("Tabs or spaces?", ["tabs", "spaces"], AUTHOR)
 
     with pytest.raises(OptionNotFoundError):
         service.vote(poll.id, other.options[0].id)
@@ -60,7 +64,7 @@ def test_vote_with_option_from_another_poll_is_rejected(service):
 
 def test_vote_on_closed_poll_is_rejected(repository):
     poll = PollService(repository, clock=lambda: NOW).create_poll(
-        "Best editor?", ["vim", "emacs"], closes_at=NOW + timedelta(hours=1)
+        "Best editor?", ["vim", "emacs"], AUTHOR, closes_at=NOW + timedelta(hours=1)
     )
     later = PollService(repository, clock=lambda: NOW + timedelta(hours=2))
 
@@ -69,7 +73,7 @@ def test_vote_on_closed_poll_is_rejected(repository):
 
 
 def test_results_count_votes_and_percentages(service):
-    poll = service.create_poll("Best editor?", ["vim", "emacs", "vscode"])
+    poll = service.create_poll("Best editor?", ["vim", "emacs", "vscode"], AUTHOR)
     vim, emacs, vscode = poll.options
     for option in (vim, vim, emacs):
         service.vote(poll.id, option.id)
@@ -85,7 +89,7 @@ def test_results_count_votes_and_percentages(service):
 
 
 def test_results_without_votes(service):
-    poll = service.create_poll("Best editor?", ["vim", "emacs"])
+    poll = service.create_poll("Best editor?", ["vim", "emacs"], AUTHOR)
 
     results = service.get_results(poll.id)
 

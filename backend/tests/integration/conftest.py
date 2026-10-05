@@ -1,10 +1,11 @@
 import os
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
 from alembic import command
 from alembic.config import Config
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, create_engine, make_url, text
 from sqlalchemy.exc import OperationalError
@@ -66,8 +67,36 @@ def session(engine) -> Iterator[Session]:
         connection.execute(text("TRUNCATE users, polls, options, votes RESTART IDENTITY CASCADE"))
 
 
+PASSWORD = "correct horse battery"
+
+
 @pytest.fixture
-def client(session) -> TestClient:
+def app(session) -> FastAPI:
     app = create_app()
     app.dependency_overrides[get_session] = lambda: session
+    return app
+
+
+@pytest.fixture
+def client(app) -> TestClient:
+    """Anonymous client."""
     return TestClient(app)
+
+
+@pytest.fixture
+def login_as(app) -> Callable[[str], TestClient]:
+    """Return a factory creating a client logged in as a freshly registered user."""
+
+    def _login_as(email: str) -> TestClient:
+        client = TestClient(app)
+        credentials = {"email": email, "password": PASSWORD}
+        assert client.post("/api/v1/auth/register", json=credentials).status_code == 201
+        assert client.post("/api/v1/auth/login", json=credentials).status_code == 204
+        return client
+
+    return _login_as
+
+
+@pytest.fixture
+def auth_client(login_as) -> TestClient:
+    return login_as("alice@example.com")
