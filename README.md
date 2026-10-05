@@ -35,7 +35,7 @@ cd backend
 uv sync
 set -a && . ../.env && set +a
 uv run alembic upgrade head   # create the schema
-uv run fastapi dev app/main.py
+uv run uvicorn app.main:app --reload
 ```
 
 In another terminal:

@@ -1,0 +1,8 @@
+# Only what the image needs is sent to the build: never local envs, caches or tests.
+**
+!pyproject.toml
+!uv.lock
+!alembic.ini
+!alembic/
+!app/
+**/__pycache__
