@@ -65,7 +65,7 @@ containers for the application (see the [README](../../README.md)).
 
 | Path | Behaviour |
 |---|---|
-| `/api/` | Reverse proxy to the backend (same origin for the browser) |
+| `/api/` | Reverse proxy to the backend (same origin for the browser). The host name is re-resolved every 10 s, so a restarted backend with a new IP is found again; an unreachable backend fails fast with `502` (5 s connect timeout) |
 | `/assets/` | Fingerprinted files, cached one year (`immutable`), gzip |
 | `/healthz` | Container liveness |
 | anything else | `index.html` (client-side routes), `no-cache` so deployments are picked up |

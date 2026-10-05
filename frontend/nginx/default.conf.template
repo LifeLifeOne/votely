@@ -19,9 +19,17 @@ server {
         return 200 "ok\n";
     }
 
+    # Re-resolve the API host name regularly: a restarted backend may get a new IP address.
+    # NGINX_LOCAL_RESOLVERS is read from /etc/resolv.conf by the image entrypoint.
+    resolver ${NGINX_LOCAL_RESOLVERS} valid=10s;
+
     # Same origin for the browser: /api is forwarded to the backend.
     location /api/ {
-        proxy_pass ${VOTELY_API_UPSTREAM};
+        # A variable forces nginx to resolve the name at request time, not only at startup.
+        set $api_upstream ${VOTELY_API_UPSTREAM};
+        proxy_pass $api_upstream;
+        # Fail fast (502) when the API is down instead of hanging the browser.
+        proxy_connect_timeout 5s;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

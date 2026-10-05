@@ -21,7 +21,8 @@ COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Address of the API, used by the /api reverse proxy.
-ENV VOTELY_API_UPSTREAM=http://backend:8000
+ENV VOTELY_API_UPSTREAM=http://backend:8000 \
+    NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
 
 USER 101
 
