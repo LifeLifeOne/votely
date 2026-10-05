@@ -15,6 +15,7 @@ workflow:
 
 stages:
   - lint
+  - test
 
 default:
   interruptible: true

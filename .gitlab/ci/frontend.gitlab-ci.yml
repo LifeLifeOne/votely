@@ -25,3 +25,22 @@ frontend:lint:
     - npm run lint
     - npm run format:check
     - npm run typecheck
+
+frontend:test:
+  extends: .frontend
+  stage: test
+  needs: [frontend:lint]
+  script:
+    - >
+      npx vitest run --coverage
+      --reporter=default --reporter=junit --outputFile.junit=junit.xml
+      --coverage.reporter=text-summary --coverage.reporter=cobertura
+  coverage: '/^Lines\s*:\s*(\d+(?:\.\d+)?)%/'
+  artifacts:
+    when: always
+    expire_in: 1 week
+    reports:
+      junit: frontend/junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: frontend/coverage/cobertura-coverage.xml

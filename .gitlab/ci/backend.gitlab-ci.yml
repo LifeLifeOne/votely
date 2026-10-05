@@ -28,3 +28,30 @@ backend:lint:
   script:
     - uv run ruff check .
     - uv run ruff format --check .
+
+backend:test:
+  extends: .backend
+  stage: test
+  # Start as soon as the backend is linted, without waiting for the other components.
+  needs: [backend:lint]
+  services:
+    # Real PostgreSQL: integration tests and migrations run against the same engine as production.
+    - name: postgres:16-alpine
+      alias: postgres
+  variables:
+    # Throwaway credentials for the CI service container only.
+    POSTGRES_USER: votely
+    POSTGRES_PASSWORD: votely
+    POSTGRES_DB: votely
+    VOTELY_DATABASE_URL: postgresql+psycopg://votely:votely@postgres:5432/votely
+  script:
+    - uv run pytest --junitxml=junit.xml --cov-report=term --cov-report=xml:coverage.xml
+  coverage: '/^TOTAL.*\s(\d+(?:\.\d+)?)%/'
+  artifacts:
+    when: always
+    expire_in: 1 week
+    reports:
+      junit: backend/junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: backend/coverage.xml
