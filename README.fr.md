@@ -8,7 +8,7 @@ Votely est une application de sondages légère : créer un sondage, le partager
 
 | Couche | Technologie |
 |---|---|
-| Backend | Python 3.12 · FastAPI · SQLAlchemy 2 |
+| Backend | Python 3.12 · FastAPI · SQLAlchemy 2 · Alembic |
 | Base de données | PostgreSQL 16 |
 
 ## Organisation du dépôt
@@ -16,7 +16,8 @@ Votely est une application de sondages légère : créer un sondage, le partager
 ```
 .
 ├── backend/        # API REST (FastAPI)
-└── compose.yaml    # Stack de développement local
+├── compose.yaml    # Stack de développement local
+└── docs/           # Documentation technique
 ```
 
 ## Démarrage
@@ -31,6 +32,7 @@ docker compose up -d db       # PostgreSQL sur localhost:5432
 cd backend
 uv sync
 set -a && . ../.env && set +a
+uv run alembic upgrade head   # création du schéma
 uv run fastapi dev app/main.py
 ```
 
@@ -46,6 +48,10 @@ uv run ruff check .     # lint
 uv run ruff format .    # formatage
 uvx pre-commit install  # hooks git (lint + détection de secrets)
 ```
+
+## Documentation
+
+- [Backend](docs/BACK.md) : architecture, API, modèle de données, migrations, tests (en anglais)
 
 ## Licence
 
