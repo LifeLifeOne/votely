@@ -1,0 +1,267 @@
+:root {
+  --bg: #f7f7fb;
+  --surface: #ffffff;
+  --text: #1f2330;
+  --muted: #6b7080;
+  --border: #e3e4ec;
+  --accent: #4f46e5;
+  --accent-text: #ffffff;
+  --accent-soft: #e8e7fd;
+  --danger: #c0262d;
+  --success: #17803d;
+  --radius: 10px;
+
+  color-scheme: light dark;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14151b;
+    --surface: #1d1f27;
+    --text: #e8e9ef;
+    --muted: #9a9eb0;
+    --border: #2e313d;
+    --accent: #8b85ff;
+    --accent-text: #14151b;
+    --accent-soft: #2b2a4a;
+    --danger: #ff7b80;
+    --success: #5ad38a;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+}
+
+h1,
+h2 {
+  line-height: 1.25;
+}
+
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 16px 48px;
+}
+
+/* Header */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Cards and lists */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.stack {
+  display: grid;
+  gap: 12px;
+}
+
+.poll-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.poll-link:hover,
+.poll-link:focus-visible {
+  border-color: var(--accent);
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Forms */
+
+form {
+  display: grid;
+  gap: 16px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+}
+
+input {
+  font: inherit;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+input:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+fieldset {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+legend {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.option-row {
+  display: flex;
+  gap: 8px;
+}
+
+.option-row input {
+  flex: 1;
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.choice:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Buttons */
+
+button,
+.button {
+  font: inherit;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+
+button.secondary,
+.button.secondary {
+  background: transparent;
+  color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Feedback */
+
+.error {
+  color: var(--danger);
+  margin: 0;
+}
+
+.success {
+  color: var(--success);
+  margin: 0;
+}
+
+/* Results */
+
+.results {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.result-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bar {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.4s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar-fill {
+    transition: none;
+  }
+}
