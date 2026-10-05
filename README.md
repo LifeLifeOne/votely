@@ -1,6 +1,6 @@
 # Votely
 
-[🇫🇷 Version française](README.fr.md)
+[![English](https://img.shields.io/badge/lang-English-blue)](README.md) [![Français](https://img.shields.io/badge/lang-Fran%C3%A7ais-lightgrey)](README.fr.md)
 
 Votely is a lightweight polling application: create a poll, share it, collect votes (one per account) and follow the results live.
 
@@ -17,7 +17,7 @@ Votely is a lightweight polling application: create a poll, share it, collect vo
 .
 ├── backend/        # REST API (FastAPI)
 ├── compose.yaml    # Local development stack
-└── docs/           # Technical documentation
+└── docs/           # Technical documentation (en/, fr/)
 ```
 
 ## Getting started
@@ -51,7 +51,7 @@ uvx pre-commit install  # git hooks (lint + secret scanning)
 
 ## Documentation
 
-- [Backend](docs/BACK.md): architecture, authentication, API, data model, migrations, tests
+- [Backend](docs/en/BACK.md): architecture, authentication, API, data model, migrations, tests
 
 ## License
 

@@ -1,6 +1,6 @@
 # Votely
 
-[🇬🇧 English version](README.md)
+[![English](https://img.shields.io/badge/lang-English-lightgrey)](README.md) [![Français](https://img.shields.io/badge/lang-Fran%C3%A7ais-blue)](README.fr.md)
 
 Votely est une application de sondages légère : créer un sondage, le partager, recueillir des votes (un par compte) et suivre les résultats en direct.
 
@@ -17,7 +17,7 @@ Votely est une application de sondages légère : créer un sondage, le partager
 .
 ├── backend/        # API REST (FastAPI)
 ├── compose.yaml    # Stack de développement local
-└── docs/           # Documentation technique
+└── docs/           # Documentation technique (en/, fr/)
 ```
 
 ## Démarrage
@@ -51,7 +51,7 @@ uvx pre-commit install  # hooks git (lint + détection de secrets)
 
 ## Documentation
 
-- [Backend](docs/BACK.md) : architecture, authentification, API, modèle de données, migrations, tests (en anglais)
+- [Backend](docs/fr/BACK.md) : architecture, authentification, API, modèle de données, migrations, tests
 
 ## Licence
 

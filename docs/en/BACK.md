@@ -1,5 +1,7 @@
 # Backend
 
+[![English](https://img.shields.io/badge/lang-English-blue)](BACK.md) [![Français](https://img.shields.io/badge/lang-Fran%C3%A7ais-lightgrey)](../fr/BACK.md)
+
 REST API written in Python 3.12 with FastAPI, SQLAlchemy 2 and PostgreSQL 16.
 Dependencies are managed with [uv](https://docs.astral.sh/uv/) (`pyproject.toml` + `uv.lock`).
 
