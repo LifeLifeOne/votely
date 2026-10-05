@@ -1,6 +1,6 @@
 # Votely
 
-[![English](https://img.shields.io/badge/lang-English-lightgrey)](README.md) [![Français](https://img.shields.io/badge/lang-Fran%C3%A7ais-blue)](README.fr.md)
+[![English](https://img.shields.io/badge/lang-English-lightgrey)](README.md) [![Français](https://img.shields.io/badge/lang-Fran%C3%A7ais-blue)](README.fr.md) [![pipeline](https://gitlab.com/StateOfFlowHunter/votely/badges/main/pipeline.svg)](https://gitlab.com/StateOfFlowHunter/votely/-/pipelines)
 
 Votely est une application de sondages légère : créer un sondage, le partager, recueillir des votes (un par compte) et suivre les résultats en direct.
 
@@ -93,6 +93,7 @@ uvx pre-commit install  # hooks git (lint + détection de secrets)
 - [Frontend](docs/fr/FRONT.md) : architecture, communication avec l'API, expérience utilisateur, tests
 - [Conteneurs](docs/fr/CONTAINERS.md) : images, stack Docker Compose, durcissement, scans
 - [Tests](docs/fr/TESTS.md) : stratégie de test, tests end-to-end, comment les regarder
+- [Intégration continue](docs/fr/CI.md) : organisation du pipeline, règles, stages
 
 ## Licence
 
