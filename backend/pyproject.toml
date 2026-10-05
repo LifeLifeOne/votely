@@ -32,4 +32,9 @@ known-third-party = ["alembic"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra"
+addopts = "-ra --cov=app --cov-report=term-missing"
+markers = ["integration: tests that need a running PostgreSQL"]
+
+[tool.coverage.report]
+fail_under = 90
+skip_covered = true
