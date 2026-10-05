@@ -28,8 +28,10 @@
     IMAGE: $CI_REGISTRY_IMAGE/$COMPONENT
   before_script:
     - echo "$CI_REGISTRY_PASSWORD" | docker login --username "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
-    # The docker-container driver can export the layer cache to the registry.
-    - docker buildx create --use --driver docker-container
+    # The docker-container driver can export the layer cache to the registry. With the TLS
+    # connection to the dind service, buildx needs a named context to create its builder.
+    - docker context create ci
+    - docker buildx create --use --driver docker-container ci
   script:
     # Only the default branch writes the shared layer cache; merge requests read it.
     - |
