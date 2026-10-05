@@ -11,6 +11,7 @@ Votely is a lightweight polling application: create a poll, share it, collect vo
 | Frontend | React 19 · TypeScript · Vite · TanStack Query |
 | Backend | Python 3.12 · FastAPI · SQLAlchemy 2 · Alembic |
 | Database | PostgreSQL 16 |
+| Containers | Docker multi-stage images · nginx · Docker Compose |
 
 ## Repository layout
 
@@ -18,11 +19,20 @@ Votely is a lightweight polling application: create a poll, share it, collect vo
 .
 ├── backend/        # REST API (FastAPI)
 ├── frontend/       # Web application (React)
-├── compose.yaml    # Local development stack
+├── compose.yaml    # Full stack (Docker Compose)
 └── docs/           # Technical documentation (en/, fr/)
 ```
 
 ## Getting started
+
+### Run the full stack with Docker
+
+```bash
+cp .env.example .env          # then set a database password and a JWT secret (openssl rand -hex 32)
+docker compose up --build     # http://localhost:8080
+```
+
+### Local development
 
 Prerequisites: Docker, [mise](https://mise.jdx.dev/) (installs Python 3.12, uv and Node.js 24).
 
@@ -70,6 +80,7 @@ uvx pre-commit install  # git hooks (lint + secret scanning)
 
 - [Backend](docs/en/BACK.md): architecture, authentication, API, data model, migrations, tests
 - [Frontend](docs/en/FRONT.md): architecture, API communication, user experience, tests
+- [Containers](docs/en/CONTAINERS.md): images, Docker Compose stack, hardening, scans
 
 ## License
 
