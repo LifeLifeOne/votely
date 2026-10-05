@@ -1,0 +1,60 @@
+# Building blocks shared by several components, reused with `extends` and `!reference`.
+
+# Paths that affect the application images and the end-to-end tests. Build and e2e jobs run
+# when any of them changes, so the two images under test always come from the same pipeline.
+.rules:app:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - backend/**/*
+        - frontend/**/*
+        - e2e/**/*
+        - compose*.yaml
+        - .gitlab-ci.yml
+        - .gitlab/ci/**/*
+    - if: $CI_PIPELINE_SOURCE != "merge_request_event"
+
+# Build a component image (COMPONENT=backend|frontend) with BuildKit and push it to the
+# project's container registry, tagged with the full commit SHA (immutable, traceable).
+.docker-build:
+  image: docker:29
+  services:
+    - docker:29-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: /certs
+    DOCKER_TLS_VERIFY: "1"
+    DOCKER_CERT_PATH: /certs/client
+    IMAGE: $CI_REGISTRY_IMAGE/$COMPONENT
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login --username "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    # The docker-container driver can export the layer cache to the registry.
+    - docker buildx create --use --driver docker-container
+  script:
+    # Only the default branch writes the shared layer cache; merge requests read it.
+    - |
+      cache_to=""
+      if [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
+        cache_to="--cache-to type=registry,ref=$IMAGE:buildcache,mode=max"
+      fi
+    - >
+      docker buildx build "$COMPONENT"
+      --pull
+      --cache-from "type=registry,ref=$IMAGE:buildcache"
+      $cache_to
+      --label "org.opencontainers.image.source=$CI_PROJECT_URL"
+      --label "org.opencontainers.image.revision=$CI_COMMIT_SHA"
+      --label "org.opencontainers.image.created=$CI_PIPELINE_CREATED_AT"
+      --tag "$IMAGE:$CI_COMMIT_SHA"
+      --metadata-file metadata.json
+      --push
+    # Expose the pushed digest to later jobs (e2e, scans, signing) as a dotenv variable,
+    # e.g. BACKEND_IMAGE=registry.gitlab.com/.../backend@sha256:...
+    - |
+      digest=$(grep -o '"containerimage.digest": *"[^"]*"' metadata.json | grep -o 'sha256:[0-9a-f]*')
+      echo "$(echo "$COMPONENT" | tr a-z A-Z)_IMAGE=$IMAGE@$digest" | tee build.env
+  artifacts:
+    reports:
+      dotenv: build.env
+  rules:
+    - !reference [.rules:app, rules]

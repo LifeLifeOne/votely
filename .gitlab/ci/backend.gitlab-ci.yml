@@ -55,3 +55,14 @@ backend:test:
       coverage_report:
         coverage_format: cobertura
         path: backend/coverage.xml
+
+backend:build:
+  extends: .docker-build
+  stage: build
+  variables:
+    COMPONENT: backend
+  # Never publish an image whose tests failed. Optional: on a merge request that only touches
+  # the other component, the tests are skipped but the image is still rebuilt for e2e.
+  needs:
+    - job: backend:test
+      optional: true

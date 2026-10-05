@@ -44,3 +44,14 @@ frontend:test:
       coverage_report:
         coverage_format: cobertura
         path: frontend/coverage/cobertura-coverage.xml
+
+frontend:build:
+  extends: .docker-build
+  stage: build
+  variables:
+    COMPONENT: frontend
+  # Never publish an image whose tests failed. Optional: on a merge request that only touches
+  # the other component, the tests are skipped but the image is still rebuilt for e2e.
+  needs:
+    - job: frontend:test
+      optional: true
