@@ -9,7 +9,21 @@ look.
 ```
 infra/terraform/
 ├── .tflint.hcl     # lint rules shared by every stack (Terraform + AWS rulesets)
-└── bootstrap/      # remote state bucket and monthly budget alert
+├── bootstrap/      # kept: state bucket, budget alert, permanent public IP
+└── server/         # created and destroyed at will: network, firewall, server
+```
+
+```mermaid
+flowchart LR
+    internet([Internet]) -->|"80, 443"| sg
+    you([You, signed in with SSO]) -.->|"Systems Manager session"| ssm[AWS Systems Manager]
+    subgraph vpc [VPC 10.42.0.0/16 · eu-west-1]
+        subgraph subnet [public subnet 10.42.1.0/24]
+            sg{{security group}} --> server["EC2 t3a.large<br/>Amazon Linux 2023"]
+        end
+    end
+    server -.->|"outbound only"| ssm
+    eip[(Elastic IP<br/>bootstrap stack)] --- server
 ```
 
 Each folder is a separate **stack**, with its own state and lifecycle: the bootstrap is created
@@ -94,14 +108,55 @@ terraform plan                                 # "No changes": code, state and A
 plan: if anything changed in between, Terraform refuses the outdated plan instead of doing
 something else.
 
+## Server
+
+The `server` stack holds everything that only costs money while it runs. It is created at the
+start of a work session and destroyed at the end; the permanent IP address stays in the
+bootstrap stack, so the public address (and later the hostname and its HTTPS certificate) never
+change.
+
+| Resource | Settings |
+|---|---|
+| VPC and public subnet | `10.42.0.0/16`, one subnet, an internet gateway. **No NAT gateway**: it would cost more than the server, and the server has its own public address |
+| Default security group | Emptied, so nothing can use it by accident |
+| Security group | Inbound **80 and 443 only**; outbound open (images, packages, Let's Encrypt, Systems Manager) |
+| IAM role | `AmazonSSMManagedInstanceCore` only: the server can register with Systems Manager, nothing else |
+| EC2 instance | `t3a.large` (2 vCPU, 8 GiB), latest Amazon Linux 2023, 30 GiB encrypted gp3 disk |
+| Instance metadata | IMDSv2 required, one network hop: containers cannot read the instance credentials |
+| Elastic IP | Created by the bootstrap stack (`prevent_destroy`), associated by the server stack, found by its `Name` tag |
+
+**No SSH.** Port 22 is closed and no key pair exists. A shell is opened through AWS Systems
+Manager, with the same SSO sign-in as the console; every session is recorded in the Session
+Manager history. The server connects out to Systems Manager, so no inbound port is needed.
+
+```bash
+cd infra/terraform/server
+terraform init
+terraform plan -out=server.tfplan
+terraform apply server.tfplan       # ~2 minutes, prints instance_id, public_ip and shell
+
+aws ssm start-session --target <instance_id>   # needs the Session Manager plugin
+nc -zv -w 5 <public_ip> 22                     # times out: SSH is blocked
+
+terraform destroy                   # end of the session: the server stops costing money
+```
+
+The Session Manager plugin is a single binary published by AWS; on Linux it can be extracted
+from the official `.deb` (`session-manager-plugin.deb`) into `~/.local/bin`.
+
+A newer Amazon Linux image is picked up each time the server is recreated; a running server is
+never replaced because a new image was published (`ignore_changes = [ami]`).
+
 ## Checks
 
 ```bash
 cd infra/terraform
 terraform fmt -recursive -check
 terraform -chdir=bootstrap validate
+terraform -chdir=server validate
 tflint --init --config="$PWD/.tflint.hcl"
 tflint --chdir=bootstrap --config="$PWD/.tflint.hcl"
+tflint --chdir=server --config="$PWD/.tflint.hcl"
 ```
 
 Provider versions are locked in `.terraform.lock.hcl` for Linux and macOS, so every machine and
@@ -113,3 +168,8 @@ the CI use the same provider builds.
 |---|---|
 | State bucket (a few KB) | a few cents per year |
 | Budget alert | free (the first two budgets of an account are free) |
+| Elastic IP, kept between sessions | ~0.005 USD per hour, ~3.60 USD per month |
+| Server (`t3a.large` + 30 GiB disk) while it runs | ~0.09 USD per hour, ~0.70 USD for an 8-hour session |
+
+The server only runs during work sessions: `terraform destroy` in `server/` stops its cost, and
+the budget alert reports any oversight.

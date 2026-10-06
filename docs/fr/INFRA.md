@@ -9,7 +9,21 @@ regarder.
 ```
 infra/terraform/
 ├── .tflint.hcl     # règles de lint communes à toutes les stacks (Terraform + AWS)
-└── bootstrap/      # bucket du state distant et alerte budget mensuelle
+├── bootstrap/      # conservé : bucket du state, alerte budget, IP publique permanente
+└── server/         # créé et détruit à volonté : réseau, pare-feu, serveur
+```
+
+```mermaid
+flowchart LR
+    internet([Internet]) -->|"80, 443"| sg
+    you([Toi, connecté en SSO]) -.->|"session Systems Manager"| ssm[AWS Systems Manager]
+    subgraph vpc [VPC 10.42.0.0/16 · eu-west-1]
+        subgraph subnet [sous-réseau public 10.42.1.0/24]
+            sg{{security group}} --> server["EC2 t3a.large<br/>Amazon Linux 2023"]
+        end
+    end
+    server -.->|"sortant uniquement"| ssm
+    eip[(Elastic IP<br/>stack bootstrap)] --- server
 ```
 
 Chaque dossier est une **stack** séparée, avec son propre state et son propre cycle de vie : le
@@ -94,14 +108,56 @@ terraform plan                                 # "No changes" : code, state et A
 ce plan : si quelque chose a changé entre-temps, Terraform refuse le plan périmé au lieu de faire
 autre chose.
 
+## Serveur
+
+La stack `server` regroupe tout ce qui ne coûte que lorsqu'il tourne. Elle est créée au début
+d'une session de travail et détruite à la fin ; l'adresse IP permanente reste dans la stack
+bootstrap : l'adresse publique (et plus tard le nom d'hôte et son certificat HTTPS) ne change
+jamais.
+
+| Ressource | Réglages |
+|---|---|
+| VPC et sous-réseau public | `10.42.0.0/16`, un sous-réseau, une internet gateway. **Pas de NAT gateway** : elle coûterait plus cher que le serveur, qui a sa propre adresse publique |
+| Security group par défaut | Vidé : rien ne peut l'utiliser par accident |
+| Security group | Entrée **80 et 443 uniquement** ; sortie libre (images, paquets, Let's Encrypt, Systems Manager) |
+| Rôle IAM | `AmazonSSMManagedInstanceCore` uniquement : le serveur peut s'enregistrer auprès de Systems Manager, rien d'autre |
+| Instance EC2 | `t3a.large` (2 vCPU, 8 Gio), dernière Amazon Linux 2023, disque gp3 chiffré de 30 Gio |
+| Métadonnées de l'instance | IMDSv2 obligatoire, un seul saut réseau : les conteneurs ne peuvent pas lire les identifiants de l'instance |
+| Elastic IP | Créée par la stack bootstrap (`prevent_destroy`), associée par la stack server, retrouvée par son tag `Name` |
+
+**Pas de SSH.** Le port 22 est fermé et aucune paire de clés n'existe. Un terminal s'ouvre via
+AWS Systems Manager, avec la même connexion SSO que la console ; chaque session est tracée dans
+l'historique de Session Manager. C'est le serveur qui se connecte à Systems Manager : aucun port
+entrant n'est nécessaire.
+
+```bash
+cd infra/terraform/server
+terraform init
+terraform plan -out=server.tfplan
+terraform apply server.tfplan       # ~2 minutes, affiche instance_id, public_ip et shell
+
+aws ssm start-session --target <instance_id>   # nécessite le plugin Session Manager
+nc -zv -w 5 <public_ip> 22                     # expire : SSH est bloqué
+
+terraform destroy                   # fin de session : le serveur ne coûte plus rien
+```
+
+Le plugin Session Manager est un simple binaire publié par AWS ; sous Linux, on peut l'extraire
+du `.deb` officiel (`session-manager-plugin.deb`) dans `~/.local/bin`.
+
+Une image Amazon Linux plus récente est prise à chaque recréation du serveur ; un serveur en
+marche n'est jamais remplacé parce qu'une nouvelle image est sortie (`ignore_changes = [ami]`).
+
 ## Vérifications
 
 ```bash
 cd infra/terraform
 terraform fmt -recursive -check
 terraform -chdir=bootstrap validate
+terraform -chdir=server validate
 tflint --init --config="$PWD/.tflint.hcl"
 tflint --chdir=bootstrap --config="$PWD/.tflint.hcl"
+tflint --chdir=server --config="$PWD/.tflint.hcl"
 ```
 
 Les versions des providers sont verrouillées dans `.terraform.lock.hcl` pour Linux et macOS : chaque
@@ -113,3 +169,8 @@ machine et la CI utilisent les mêmes builds.
 |---|---|
 | Bucket du state (quelques Ko) | quelques centimes par an |
 | Alerte budget | gratuite (les deux premiers budgets d'un compte sont gratuits) |
+| Elastic IP, conservée entre les sessions | ~0,005 USD de l'heure, ~3,60 USD par mois |
+| Serveur (`t3a.large` + disque de 30 Gio) quand il tourne | ~0,09 USD de l'heure, ~0,70 USD pour une session de 8 heures |
+
+Le serveur ne tourne que pendant les sessions de travail : `terraform destroy` dans `server/`
+arrête son coût, et l'alerte budget signale tout oubli.
