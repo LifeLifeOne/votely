@@ -24,6 +24,8 @@ Votely est une application de sondages légère : créer un sondage, le partager
 | Base de données | PostgreSQL 16 |
 | Conteneurs | Images Docker multi-étapes · nginx · Docker Compose |
 | Tests | pytest · Vitest · Testing Library · MSW · Playwright |
+| CI/CD | GitLab CI · gitleaks · Semgrep · Trivy · crane |
+| Kubernetes | Charts Helm · ingress Traefik · kind (cluster local) |
 
 ## Organisation du dépôt
 
@@ -34,6 +36,7 @@ Votely est une application de sondages légère : créer un sondage, le partager
 ├── frontend/         # Application web (React)
 ├── compose.yaml      # Stack complète (Docker Compose)
 ├── compose.e2e.yaml  # Stack jetable pour les tests end-to-end
+├── deploy/           # Kubernetes : charts Helm, cluster local (kind)
 └── docs/             # Documentation technique (en/, fr/)
 ```
 
@@ -46,12 +49,22 @@ cp .env.example .env          # puis définir un mot de passe de base et un secr
 docker compose up --build     # http://localhost:8080
 ```
 
-### Développement local
+### Lancer sur Kubernetes (cluster local)
 
-Prérequis : Docker, [mise](https://mise.jdx.dev/) (installe Python 3.12, uv et Node.js 24).
+Prérequis : Docker, [mise](https://mise.jdx.dev/).
 
 ```bash
-mise install                  # versions de Python, uv et Node.js fixées dans .mise.toml
+mise install                  # versions de kind, kubectl et Helm fixées dans .mise.toml
+deploy/kind/up.sh             # http://votely.localhost (images publiées par la CI)
+deploy/kind/down.sh           # supprimer le cluster
+```
+
+### Développement local
+
+Prérequis : Docker, [mise](https://mise.jdx.dev/) (installe Python 3.12, uv, Node.js 24 et les outils Kubernetes).
+
+```bash
+mise install                  # versions des outils fixées dans .mise.toml
 cp .env.example .env          # puis définir un mot de passe local et un secret JWT (openssl rand -hex 32)
 docker compose up -d db       # PostgreSQL sur localhost:5432
 
@@ -105,6 +118,7 @@ uvx pre-commit install  # hooks git (lint + détection de secrets)
 - [Conteneurs](docs/fr/CONTAINERS.md) : images, stack Docker Compose, durcissement, scans
 - [Tests](docs/fr/TESTS.md) : stratégie de test, tests end-to-end, comment les regarder
 - [Intégration continue](docs/fr/CI.md) : organisation du pipeline, règles, stages, versions
+- [Kubernetes](docs/fr/KUBERNETES.md) : charts Helm, cluster local, migrations, sécurité
 
 ## Licence
 

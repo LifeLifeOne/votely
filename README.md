@@ -24,6 +24,8 @@ Votely is a lightweight polling application: create a poll, share it, collect vo
 | Database | PostgreSQL 16 |
 | Containers | Docker multi-stage images · nginx · Docker Compose |
 | Tests | pytest · Vitest · Testing Library · MSW · Playwright |
+| CI/CD | GitLab CI · gitleaks · Semgrep · Trivy · crane |
+| Kubernetes | Helm charts · Traefik ingress · kind (local cluster) |
 
 ## Repository layout
 
@@ -34,6 +36,7 @@ Votely is a lightweight polling application: create a poll, share it, collect vo
 ├── frontend/         # Web application (React)
 ├── compose.yaml      # Full stack (Docker Compose)
 ├── compose.e2e.yaml  # Disposable stack for end-to-end tests
+├── deploy/           # Kubernetes: Helm charts, local cluster (kind)
 └── docs/             # Technical documentation (en/, fr/)
 ```
 
@@ -46,12 +49,22 @@ cp .env.example .env          # then set a database password and a JWT secret (o
 docker compose up --build     # http://localhost:8080
 ```
 
-### Local development
+### Run on Kubernetes (local cluster)
 
-Prerequisites: Docker, [mise](https://mise.jdx.dev/) (installs Python 3.12, uv and Node.js 24).
+Prerequisites: Docker, [mise](https://mise.jdx.dev/).
 
 ```bash
-mise install                  # Python, uv and Node.js versions pinned in .mise.toml
+mise install                  # kind, kubectl and Helm versions pinned in .mise.toml
+deploy/kind/up.sh             # http://votely.localhost (images published by the CI)
+deploy/kind/down.sh           # delete the cluster
+```
+
+### Local development
+
+Prerequisites: Docker, [mise](https://mise.jdx.dev/) (installs Python 3.12, uv, Node.js 24 and the Kubernetes tools).
+
+```bash
+mise install                  # tool versions pinned in .mise.toml
 cp .env.example .env          # then set a local password and a JWT secret (openssl rand -hex 32)
 docker compose up -d db       # PostgreSQL on localhost:5432
 
@@ -105,6 +118,7 @@ uvx pre-commit install  # git hooks (lint + secret scanning)
 - [Containers](docs/en/CONTAINERS.md): images, Docker Compose stack, hardening, scans
 - [Tests](docs/en/TESTS.md): testing strategy, end-to-end tests, how to watch them
 - [Continuous integration](docs/en/CI.md): pipeline layout, rules, stages, releases
+- [Kubernetes](docs/en/KUBERNETES.md): Helm charts, local cluster, migrations, security settings
 
 ## License
 
