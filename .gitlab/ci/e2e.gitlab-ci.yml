@@ -1,4 +1,4 @@
-# End-to-end tests (Playwright): linted here, run against the full stack in a later stage.
+# End-to-end tests (Playwright) against the full stack built by this pipeline.
 
 .e2e:
   image: node:24-alpine
@@ -25,3 +25,49 @@ e2e:lint:
   script:
     - npm run format:check
     - npm run typecheck
+
+e2e:test:
+  extends: .docker
+  stage: e2e
+  # The two images built by this pipeline, by digest (BACKEND_IMAGE, FRONTEND_IMAGE dotenv).
+  needs: [backend:build, frontend:build]
+  variables:
+    PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble
+    COMPOSE: docker compose -p votely-e2e -f compose.yaml -f compose.e2e.yaml
+    # Throwaway stack: CI-only database credentials, plain HTTP inside the dind network.
+    POSTGRES_USER: votely
+    POSTGRES_PASSWORD: votely
+    POSTGRES_DB: votely
+    VOTELY_COOKIE_SECURE: "false"
+  script:
+    - export VOTELY_BACKEND_IMAGE="$BACKEND_IMAGE" VOTELY_FRONTEND_IMAGE="$FRONTEND_IMAGE"
+    # A fresh signing key for every run: nothing secret is stored in the pipeline.
+    - export VOTELY_JWT_SECRET="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+    - $COMPOSE up --detach --no-build --wait
+    # Playwright runs in its own container on the stack network and reaches nginx directly.
+    # Files are copied in and out (docker cp): the dind daemon does not see the job filesystem.
+    - >
+      docker create --name playwright --network votely-e2e_default --ipc host
+      --env CI=true --env E2E_BASE_URL=http://frontend:8080 --workdir /e2e
+      "$PLAYWRIGHT_IMAGE" sh -c "npm ci --no-audit --no-fund && npx playwright test"
+    - docker cp e2e/. playwright:/e2e
+    - docker start --attach playwright
+  after_script:
+    # Collect reports and stack logs, whatever the outcome.
+    - docker cp playwright:/e2e/playwright-report e2e/ || true
+    - docker cp playwright:/e2e/test-results e2e/ || true
+    - |
+      for c in $(docker ps -aq --filter label=com.docker.compose.project=votely-e2e); do
+        docker logs --timestamps "$c" > "e2e/$(docker inspect --format '{{.Name}}' "$c" | tr -d /).log" 2>&1
+      done
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - e2e/playwright-report/
+      - e2e/test-results/
+      - e2e/*.log
+    reports:
+      junit: e2e/test-results/junit.xml
+  rules:
+    - !reference [.rules:app, rules]
