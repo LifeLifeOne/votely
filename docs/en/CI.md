@@ -15,7 +15,8 @@ Pipelines: https://gitlab.com/StateOfFlowHunter/votely/-/pipelines
 ├── frontend.gitlab-ci.yml      # frontend:* jobs
 ├── e2e.gitlab-ci.yml           # e2e:* jobs
 ├── security.gitlab-ci.yml      # security:* jobs
-└── deploy.gitlab-ci.yml        # deploy:* jobs (Helm charts)
+├── deploy.gitlab-ci.yml        # deploy:* jobs (Helm charts)
+└── infra.gitlab-ci.yml         # infra:* jobs (Terraform)
 ```
 
 - One file per component: everything that concerns the backend pipeline is in one place, while
@@ -49,10 +50,12 @@ retried once on infrastructure failures only, never on a failing test or check.
 analyze   backend:lint-ruff  frontend:lint-oxlint  frontend:format-prettier  frontend:typecheck-tsc
           e2e:format-prettier  e2e:typecheck-tsc  security:sast-semgrep  security:deps-trivy
           deploy:lint-helm  deploy:validate-kubeconform
+          infra:format-terraform  infra:validate-terraform  infra:lint-tflint  infra:plan-terraform
 test      backend:test-pytest  frontend:test-vitest
 build     backend:build-image  frontend:build-image
 verify    e2e:test-playwright  security:scan-image-trivy: [backend, frontend]
-publish   backend:publish-image  frontend:publish-image     (release tags: *:promote-image)
+publish   backend:sign-image  frontend:sign-image  →  backend:publish-image  frontend:publish-image
+          (release tags: *:promote-image)
 ```
 
 | Stage | Purpose | Job | Tool and scope |
@@ -70,7 +73,8 @@ publish   backend:publish-image  frontend:publish-image     (release tags: *:pro
 | `build` | Production images | `backend:build-image`, `frontend:build-image` | Docker BuildKit, pushed to the GitLab container registry |
 | `verify` | The images just built | `e2e:test-playwright` | Playwright, desktop and mobile, against the full stack running those images |
 | | | `security:scan-image-trivy` | Trivy: vulnerabilities and secrets in each image, and its SBOM |
-| `publish` | Deployment tags | `backend:publish-image`, `frontend:publish-image` | crane: `main` and `main-<short sha>` on the verified images (default branch) |
+| `publish` | Signed, then tagged | `backend:sign-image`, `frontend:sign-image` | Cosign with an AWS KMS key: signature and signed SBOM attestation (default branch) |
+| | | `backend:publish-image`, `frontend:publish-image` | crane: `main` and `main-<short sha>` on the verified and signed images (default branch) |
 | | | `backend:promote-image`, `frontend:promote-image` | crane: version tag on the image verified on `main` (release tags only) |
 
 Job names follow `<component>:<action>-<tool>`: what the job does and with which tool, grouped
@@ -117,8 +121,8 @@ deployed.
   job token.
 - **SBOM** (*Software Bill of Materials*): the scan also lists every package of the image, saved
   as a CycloneDX artifact (`sbom-<component>.cdx.json`). When a new CVE is published, the SBOM
-  tells which images contain the affected package without rebuilding or rescanning them. It will
-  be signed and attached to the image with Cosign.
+  tells which images contain the affected package without rebuilding or rescanning them. It is
+  then signed and attached to the image (see [Signed images](#signed-images)).
 - **Verified**: an old `nginx:1.20-alpine` image fails the job (30 fixable HIGH/CRITICAL
   vulnerabilities), and so does an image with a GitHub token written in a layer (reported masked).
 
@@ -164,7 +168,7 @@ number to an image that was already verified on `main`.
 
 ```mermaid
 flowchart LR
-    build["build<br/>:&lt;sha&gt;"] --> verify["verify<br/>e2e + scan"] --> publish["publish<br/>:main-&lt;short sha&gt;<br/>:main"]
+    build["build<br/>:&lt;sha&gt;"] --> verify["verify<br/>e2e + scan"] --> sign["sign<br/>Cosign + KMS"] --> publish["publish<br/>:main-&lt;short sha&gt;<br/>:main"]
     tag(["git tag v1.2.0"]) --> promote["promote<br/>:1.2.0"]
     publish -. same digest .-> promote
 ```
@@ -186,6 +190,35 @@ flowchart LR
   no Docker daemon, nothing pulled, a few seconds per image.
 - Release pipelines run nothing else: the commit was already checked on `main`.
 
+### Signed images
+
+On `main`, every image is signed before it gets a deployment tag, so an unsigned image is never
+promoted.
+
+| Step | What `*:sign-image` does |
+|---|---|
+| Sign | `cosign sign` on the digest, with the key `awskms:///alias/votely-cosign`: the private key never leaves AWS KMS, the job only asks KMS to sign |
+| Attest | `cosign attest --type cyclonedx`: the SBOM from the image scan, signed and attached to the image |
+| Check | `cosign verify` and `cosign verify-attestation` with the public key committed in the repository ([`cosign.pub`](../../cosign.pub)), exactly as anyone else would |
+
+- The job reaches KMS with temporary AWS credentials obtained through OpenID Connect; only
+  pipelines of the default branch may assume the signing role (see [INFRA.md](INFRA.md#ci-access-openid-connect)).
+- As for a private company registry, nothing is sent to the public Sigstore transparency log
+  (Rekor): signatures and attestations are stored in the project registry, next to the image
+  (`sha256-…` tags, kept by the cleanup policy).
+- Anyone can check an image:
+
+  ```bash
+  cosign verify --key cosign.pub --insecure-ignore-tlog \
+    registry.gitlab.com/stateofflowhunter/votely/backend:main
+  cosign verify-attestation --key cosign.pub --insecure-ignore-tlog --type cyclonedx \
+    registry.gitlab.com/stateofflowhunter/votely/backend:main
+  ```
+
+  `--insecure-ignore-tlog` only tells Cosign not to look for the signature in the public log,
+  where it was deliberately not published. Images released before signing was introduced
+  (`0.1.0`) have no signature.
+
 To release, once the `main` pipeline of the commit has passed:
 
 ```bash
@@ -193,8 +226,9 @@ git tag -a v1.2.0 -m "v1.2.0"
 git push origin v1.2.0
 ```
 
-The registry cleanup policy keeps version tags, `main` and the build cache; older commit images
-are removed after 14 days, so a commit should be released within that time.
+The registry cleanup policy keeps version tags, `main`, the build cache and the signatures
+(`sha256-…`); older commit images are removed after 14 days, so a commit should be released
+within that time.
 
 ## End-to-end tests
 

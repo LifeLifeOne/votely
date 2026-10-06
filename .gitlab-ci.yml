@@ -36,3 +36,4 @@ include:
   - local: .gitlab/ci/e2e.gitlab-ci.yml
   - local: .gitlab/ci/security.gitlab-ci.yml
   - local: .gitlab/ci/deploy.gitlab-ci.yml
+  - local: .gitlab/ci/infra.gitlab-ci.yml

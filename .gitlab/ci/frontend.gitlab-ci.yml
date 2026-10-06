@@ -66,8 +66,8 @@ frontend:build-image:
     - job: frontend:test-vitest
       optional: true
 
-frontend:publish-image:
-  extends: .publish-image
+frontend:sign-image:
+  extends: .sign-image
   variables:
     COMPONENT: frontend
   # Only once the image passed every check of the verify stage.
@@ -75,10 +75,19 @@ frontend:publish-image:
     - frontend:build-image # FRONTEND_IMAGE digest
     - job: e2e:test-playwright
       artifacts: false
-    - job: security:scan-image-trivy
+    - job: security:scan-image-trivy # sbom-frontend.cdx.json
       parallel:
         matrix:
           - COMPONENT: frontend
+
+frontend:publish-image:
+  extends: .publish-image
+  variables:
+    COMPONENT: frontend
+  # Deployment tags only on a signed image.
+  needs:
+    - frontend:build-image # FRONTEND_IMAGE digest
+    - job: frontend:sign-image
       artifacts: false
 
 frontend:promote-image:

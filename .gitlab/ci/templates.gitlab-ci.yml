@@ -75,6 +75,45 @@
   rules:
     - !reference [.rules:app, rules]
 
+# AWS access through OpenID Connect: GitLab signs a short-lived token describing the job
+# (project, branch), AWS exchanges it for temporary credentials of the role in AWS_ROLE_ARN.
+# The AWS SDKs (Terraform, Cosign) read these two variables natively. No key is stored.
+.aws:
+  id_tokens:
+    AWS_ID_TOKEN:
+      aud: sts.amazonaws.com
+  variables:
+    AWS_REGION: eu-west-1
+    AWS_WEB_IDENTITY_TOKEN_FILE: /tmp/aws-web-identity-token
+  before_script:
+    - printf '%s' "$AWS_ID_TOKEN" > "$AWS_WEB_IDENTITY_TOKEN_FILE"
+
+# Default branch: sign the verified image with the KMS key (the private key never leaves AWS)
+# and attach its SBOM as a signed attestation. Nothing is sent to a public transparency log:
+# signatures are stored next to the image in the project registry.
+.sign-image:
+  extends: .aws
+  stage: publish
+  image:
+    name: ghcr.io/sigstore/cosign/cosign:v3.1.3-dev
+    entrypoint: [""]
+  variables:
+    AWS_ROLE_ARN: arn:aws:iam::${AWS_ACCOUNT_ID}:role/votely-ci-signer
+    COSIGN_KEY: awskms:///alias/votely-cosign
+    COSIGN_OPTIONS: --tlog-upload=false --use-signing-config=false
+  before_script:
+    - !reference [.aws, before_script]
+    - echo "$CI_REGISTRY_PASSWORD" | cosign login "$CI_REGISTRY" --username "$CI_REGISTRY_USER" --password-stdin
+  script:
+    - IMAGE=$(printenv "$(echo "$COMPONENT" | tr a-z A-Z)_IMAGE")
+    - cosign sign --yes --key "$COSIGN_KEY" $COSIGN_OPTIONS "$IMAGE"
+    - cosign attest --yes --key "$COSIGN_KEY" $COSIGN_OPTIONS --type cyclonedx --predicate "sbom-$COMPONENT.cdx.json" "$IMAGE"
+    # Check with the public key committed in the repository, as anyone can.
+    - cosign verify --key cosign.pub --insecure-ignore-tlog "$IMAGE" > /dev/null
+    - cosign verify-attestation --key cosign.pub --insecure-ignore-tlog --type cyclonedx "$IMAGE" > /dev/null
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
 # Registry client that adds tags to an image in place (no pull, no rebuild), logged in to the
 # project's container registry with the job token.
 .crane:
@@ -88,7 +127,7 @@
   before_script:
     - echo "$CI_REGISTRY_PASSWORD" | crane auth login "$CI_REGISTRY" --username "$CI_REGISTRY_USER" --password-stdin
 
-# Default branch: tag the image verified by this pipeline (digest from the build job).
+# Default branch: tag the image verified and signed by this pipeline (digest from the build job).
 #   main-<short sha>  this commit's verified image, the one a release promotes
 #   main              the latest verified image
 .publish-image:

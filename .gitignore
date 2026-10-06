@@ -22,6 +22,7 @@ dist/
 .terraform/
 *.tfstate
 *.tfstate.*
+*.tfplan
 *.tfvars
 !*.tfvars.example
 crash.log
@@ -42,3 +43,7 @@ kubeconfig*
 # Test reports
 junit.xml
 coverage.xml
+
+# Terraform override files (local-only tweaks, e.g. the bootstrap backend)
+override.tf
+*_override.tf
