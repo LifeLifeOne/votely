@@ -1,6 +1,7 @@
-# Security checks on the source code: secrets, code vulnerabilities (SAST) and vulnerable
-# dependencies (SCA). Every finding is also written as JUnit, so it shows up in the pipeline
-# Tests tab and the merge request widget (GitLab Free has no security widget).
+# Security checks: secrets, code vulnerabilities (SAST) and vulnerable dependencies (SCA) in
+# the source code, then the images built by the pipeline. Every finding is also written as JUnit,
+# so it shows up in the pipeline Tests tab and the merge request widget (GitLab Free has no
+# security widget).
 
 security:secrets-gitleaks:
   # .pre runs before every other stage: nothing is tested or built if a secret is found.
@@ -67,3 +68,45 @@ security:deps-trivy:
     paths: [trivy-deps.json]
     reports:
       junit: trivy-deps-junit.xml
+
+security:scan-image-trivy:
+  # The images built by this pipeline, by digest: what is scanned is what will be deployed.
+  stage: verify
+  needs: [backend:build-image, frontend:build-image]
+  parallel:
+    matrix:
+      - COMPONENT: [backend, frontend]
+  image:
+    name: aquasec/trivy:0.75.0
+    entrypoint: [""]
+  variables:
+    TRIVY_CACHE_DIR: $CI_PROJECT_DIR/.cache/trivy
+    TRIVY_NO_PROGRESS: "true"
+    # Pull straight from the registry (no Docker daemon needed), with the job token.
+    TRIVY_IMAGE_SRC: remote
+    TRIVY_USERNAME: $CI_REGISTRY_USER
+    TRIVY_PASSWORD: $CI_REGISTRY_PASSWORD
+  cache:
+    key: trivy
+    paths: [.cache/trivy]
+  script:
+    # BACKEND_IMAGE or FRONTEND_IMAGE, from the build job's dotenv report.
+    - IMAGE=$(printenv "$(echo "$COMPONENT" | tr a-z A-Z)_IMAGE")
+    # One scan: OS and Python packages, fixable HIGH/CRITICAL vulnerabilities, and secrets
+    # left in a layer. The JSON report also lists every package, which gives the SBOM.
+    - >
+      trivy image "$IMAGE" --scanners vuln,secret --severity HIGH,CRITICAL --ignore-unfixed
+      --format json --output "trivy-$COMPONENT.json"
+    - trivy convert --format cyclonedx --output "sbom-$COMPONENT.cdx.json" "trivy-$COMPONENT.json"
+    - trivy convert --format template --template "@/contrib/junit.tpl" --output "trivy-$COMPONENT-junit.xml" "trivy-$COMPONENT.json"
+    - trivy convert --format table --table-mode detailed --scanners vuln,secret --exit-code 1 "trivy-$COMPONENT.json"
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - trivy-$COMPONENT.json
+      - sbom-$COMPONENT.cdx.json
+    reports:
+      junit: trivy-$COMPONENT-junit.xml
+  rules:
+    - !reference [.rules:app, rules]
