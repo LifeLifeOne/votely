@@ -1,0 +1,37 @@
+{{- $ctx := dict "root" $ "component" "migrations" -}}
+# Database migrations, run by Helm before the API is installed or upgraded (ArgoCD runs Helm
+# pre-install/pre-upgrade hooks as PreSync hooks): new pods only start on the new schema.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-migrations
+  labels:
+    {{- include "votely.labels" $ctx | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    # Replace the previous Job on the next release; keep a failed one for its logs.
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  # A few retries cover a database that is still starting.
+  backoffLimit: 4
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        {{- include "votely.labels" $ctx | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        {{- include "votely.podSecurityContext" . | nindent 8 }}
+      containers:
+        - name: migrations
+          image: {{ include "votely.image" (dict "root" $ "component" "backend") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["alembic", "upgrade", "head"]
+          env:
+            {{- include "votely.backendEnv" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.migrations.resources | nindent 12 }}
+          securityContext:
+            {{- include "votely.containerSecurityContext" . | nindent 12 }}

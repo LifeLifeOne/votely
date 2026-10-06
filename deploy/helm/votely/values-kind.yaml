@@ -1,0 +1,7 @@
+# Local cluster (deploy/kind): plain HTTP on http://votely.localhost, one replica of each.
+host: votely.localhost
+cookieSecure: false
+backend:
+  replicas: 1
+frontend:
+  replicas: 1

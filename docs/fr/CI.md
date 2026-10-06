@@ -14,7 +14,8 @@ Votely est construit et testé par GitLab CI à chaque merge request et à chaqu
 ├── backend.gitlab-ci.yml       # jobs backend:*
 ├── frontend.gitlab-ci.yml      # jobs frontend:*
 ├── e2e.gitlab-ci.yml           # jobs e2e:*
-└── security.gitlab-ci.yml      # jobs security:*
+├── security.gitlab-ci.yml      # jobs security:*
+└── deploy.gitlab-ci.yml        # jobs deploy:* (charts Helm)
 ```
 
 - Un fichier par composant : tout ce qui concerne le pipeline du backend est au même endroit,
@@ -50,6 +51,7 @@ ou un lint en échec.
 .pre      security:secrets-gitleaks
 analyze   backend:lint-ruff  frontend:lint-oxlint  frontend:format-prettier  frontend:typecheck-tsc
           e2e:format-prettier  e2e:typecheck-tsc  security:sast-semgrep  security:deps-trivy
+          deploy:lint-helm  deploy:validate-kubeconform
 test      backend:test-pytest  frontend:test-vitest
 build     backend:build-image  frontend:build-image
 verify    e2e:test-playwright  security:scan-image-trivy: [backend, frontend]
@@ -65,6 +67,7 @@ publish   backend:publish-image  frontend:publish-image     (tags de version : *
 | | | `frontend:typecheck-tsc`, `e2e:typecheck-tsc` | Compilateur TypeScript, mode strict |
 | | | `security:sast-semgrep` | Semgrep : règles Python, TypeScript, React, OWASP Top 10 et Dockerfile |
 | | | `security:deps-trivy` | Trivy : vulnérabilités connues dans les dépendances de production (`uv.lock`, `package-lock.json`) |
+| | | `deploy:lint-helm`, `deploy:validate-kubeconform` | Helm lint (strict), puis chaque manifeste généré validé contre les schémas de l'API Kubernetes |
 | `test` | L'exécution du code | `backend:test-pytest` | pytest : tests unitaires et d'intégration face à un service PostgreSQL 16, migrations comprises ; couverture ≥ 90 % |
 | | | `frontend:test-vitest` | Vitest : composants et pages face à une fausse API (MSW) ; couverture ≥ 80 % des lignes |
 | `build` | Les images de production | `backend:build-image`, `frontend:build-image` | Docker BuildKit, poussées dans le registry de conteneurs GitLab |

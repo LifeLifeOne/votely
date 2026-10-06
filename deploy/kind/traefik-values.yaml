@@ -1,0 +1,13 @@
+# Traefik on kind, the ingress controller bundled with k3s: the Ingress resources of the chart
+# behave the same locally and on the server.
+service:
+  type: NodePort
+ports:
+  web:
+    nodePort: 30080 # published on localhost:80 by the kind cluster config
+  websecure:
+    expose:
+      default: false # plain HTTP locally; HTTPS comes with cert-manager on the server
+ingressClass:
+  enabled: true
+  isDefaultClass: true

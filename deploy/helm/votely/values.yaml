@@ -1,0 +1,54 @@
+# Images published by the CI pipeline: `main` (latest verified build of the default branch)
+# or a version (`0.1.0`).
+image:
+  registry: registry.gitlab.com/stateofflowhunter/votely
+  tag: main
+  # Always: `main` moves with every merge, the node must not keep an outdated copy.
+  pullPolicy: Always
+
+# Public hostname, routed by the ingress controller to the frontend.
+host: votely.localhost
+ingress:
+  className: traefik
+
+# PostgreSQL service (deploy/helm/postgres) and its credentials Secret
+# (keys: `username`, `password`, `database`).
+database:
+  host: postgres
+  existingSecret: votely-db
+
+# Secret holding the JWT signing key (key: `jwt-secret`, at least 32 characters).
+jwt:
+  existingSecret: votely-jwt
+
+# The session cookie is only sent over HTTPS. Set to false for plain HTTP (local cluster).
+cookieSecure: true
+logLevel: INFO
+
+backend:
+  replicas: 2
+  resources:
+    # Password hashing (Argon2) uses ~64 MiB per login or sign-up in progress: the limit leaves
+    # room for a burst of them (measured with the end-to-end suite running in parallel).
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+frontend:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 64Mi
+
+migrations:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi

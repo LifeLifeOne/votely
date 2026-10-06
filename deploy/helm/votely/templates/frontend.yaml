@@ -1,0 +1,68 @@
+{{- $ctx := dict "root" $ "component" "frontend" -}}
+# Web frontend (nginx): static files, and /api proxied to the backend (same origin).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-frontend
+  labels:
+    {{- include "votely.labels" $ctx | nindent 4 }}
+spec:
+  replicas: {{ .Values.frontend.replicas }}
+  selector:
+    matchLabels:
+      {{- include "votely.selectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "votely.labels" $ctx | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        {{- include "votely.podSecurityContext" . | nindent 8 }}
+        fsGroup: 101 # nginx user: makes the emptyDir volumes writable
+      containers:
+        - name: frontend
+          image: {{ include "votely.image" $ctx }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            # Fully qualified: nginx resolves the name itself, without the cluster search domains.
+            - name: VOTELY_API_UPSTREAM
+              value: http://{{ .Release.Name }}-backend.{{ .Release.Namespace }}.svc.cluster.local:8000
+          ports:
+            - name: http
+              containerPort: 8080
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+          securityContext:
+            {{- include "votely.containerSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            # nginx writes its pid, temp files and the config rendered from the template.
+            - name: tmp
+              mountPath: /tmp
+            - name: conf
+              mountPath: /etc/nginx/conf.d
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: conf
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-frontend
+  labels:
+    {{- include "votely.labels" $ctx | nindent 4 }}
+spec:
+  selector:
+    {{- include "votely.selectorLabels" $ctx | nindent 4 }}
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

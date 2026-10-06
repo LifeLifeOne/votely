@@ -1,0 +1,62 @@
+{{- $ctx := dict "root" $ "component" "backend" -}}
+# API (FastAPI). Only reachable inside the cluster, through the frontend proxy.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-backend
+  labels:
+    {{- include "votely.labels" $ctx | nindent 4 }}
+spec:
+  replicas: {{ .Values.backend.replicas }}
+  selector:
+    matchLabels:
+      {{- include "votely.selectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "votely.labels" $ctx | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        {{- include "votely.podSecurityContext" . | nindent 8 }}
+      containers:
+        - name: backend
+          image: {{ include "votely.image" $ctx }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            {{- include "votely.backendEnv" . | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8000
+          # Liveness never touches the database: an outage must not restart healthy pods.
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+          # Readiness checks the database: no traffic is sent to a pod that cannot serve it.
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+          securityContext:
+            {{- include "votely.containerSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-backend
+  labels:
+    {{- include "votely.labels" $ctx | nindent 4 }}
+spec:
+  selector:
+    {{- include "votely.selectorLabels" $ctx | nindent 4 }}
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

@@ -2,3 +2,7 @@
 python = "3.12"
 uv = "latest"
 node = "24"
+kind = "0.33"
+kubectl = "1.37"
+helm = "4.3"
+kubeconform = "0.8"
