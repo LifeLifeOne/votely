@@ -1,0 +1,6 @@
+apiVersion: v2
+name: votely
+description: "Votely polls application: API, web frontend, database migrations and ingress."
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
