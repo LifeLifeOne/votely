@@ -29,6 +29,8 @@ security:sast-semgrep:
     name: semgrep/semgrep:1.179.0
     entrypoint: [""]
   script:
+    # The image expects the code mounted on /src (docker run usage); in CI it is the job directory.
+    - unset SEMGREP_IN_DOCKER
     # Community rulesets for our languages and the OWASP Top 10. --error fails the job on findings.
     - >
       semgrep scan --metrics=off --error
