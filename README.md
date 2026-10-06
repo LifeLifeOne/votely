@@ -93,7 +93,7 @@ uvx pre-commit install  # git hooks (lint + secret scanning)
 - [Frontend](docs/en/FRONT.md): architecture, API communication, user experience, tests
 - [Containers](docs/en/CONTAINERS.md): images, Docker Compose stack, hardening, scans
 - [Tests](docs/en/TESTS.md): testing strategy, end-to-end tests, how to watch them
-- [Continuous integration](docs/en/CI.md): pipeline layout, rules, stages
+- [Continuous integration](docs/en/CI.md): pipeline layout, rules, stages, releases
 
 ## License
 

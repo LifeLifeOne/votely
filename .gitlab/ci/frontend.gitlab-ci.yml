@@ -16,7 +16,7 @@
         - frontend/**/*
         - .gitlab-ci.yml
         - .gitlab/ci/frontend.gitlab-ci.yml
-    - if: $CI_PIPELINE_SOURCE != "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 frontend:lint-oxlint:
   extends: .frontend
@@ -65,3 +65,23 @@ frontend:build-image:
   needs:
     - job: frontend:test-vitest
       optional: true
+
+frontend:publish-image:
+  extends: .publish-image
+  variables:
+    COMPONENT: frontend
+  # Only once the image passed every check of the verify stage.
+  needs:
+    - frontend:build-image # FRONTEND_IMAGE digest
+    - job: e2e:test-playwright
+      artifacts: false
+    - job: security:scan-image-trivy
+      parallel:
+        matrix:
+          - COMPONENT: frontend
+      artifacts: false
+
+frontend:promote-image:
+  extends: .promote-image
+  variables:
+    COMPONENT: frontend

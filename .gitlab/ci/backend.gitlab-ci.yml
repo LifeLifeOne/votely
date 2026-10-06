@@ -14,13 +14,13 @@
   before_script:
     - cd backend
   rules:
-    # Merge requests: only when the backend or its pipeline changed. Default branch and tags: always.
+    # Merge requests: only when the backend or its pipeline changed. Default branch: always.
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - backend/**/*
         - .gitlab-ci.yml
         - .gitlab/ci/backend.gitlab-ci.yml
-    - if: $CI_PIPELINE_SOURCE != "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 backend:lint-ruff:
   extends: .backend
@@ -66,3 +66,23 @@ backend:build-image:
   needs:
     - job: backend:test-pytest
       optional: true
+
+backend:publish-image:
+  extends: .publish-image
+  variables:
+    COMPONENT: backend
+  # Only once the image passed every check of the verify stage.
+  needs:
+    - backend:build-image # BACKEND_IMAGE digest
+    - job: e2e:test-playwright
+      artifacts: false
+    - job: security:scan-image-trivy
+      parallel:
+        matrix:
+          - COMPONENT: backend
+      artifacts: false
+
+backend:promote-image:
+  extends: .promote-image
+  variables:
+    COMPONENT: backend

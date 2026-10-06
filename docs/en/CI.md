@@ -32,7 +32,8 @@ Pipelines: https://gitlab.com/StateOfFlowHunter/votely/-/pipelines
 | Merge request | yes | only components whose files (or their CI file) changed |
 | Push to a branch with an open merge request | no (the merge request pipeline covers it) | – |
 | Push to `main` | yes | all jobs |
-| Tag | yes | all jobs |
+| Release tag `vX.Y.Z` | yes | only `*:promote-image` (see [Releases](#publishing-and-releases)) |
+| Other tags | no | – |
 
 Filtering merge request jobs by changed paths keeps pipelines fast and saves CI minutes; `main`
 always runs everything, so the default branch is always fully verified.
@@ -49,6 +50,7 @@ analyze   backend:lint-ruff  frontend:lint-oxlint  frontend:format-prettier  fro
 test      backend:test-pytest  frontend:test-vitest
 build     backend:build-image  frontend:build-image
 verify    e2e:test-playwright  security:scan-image-trivy: [backend, frontend]
+publish   backend:publish-image  frontend:publish-image     (release tags: *:promote-image)
 ```
 
 | Stage | Purpose | Job | Tool and scope |
@@ -65,6 +67,8 @@ verify    e2e:test-playwright  security:scan-image-trivy: [backend, frontend]
 | `build` | Production images | `backend:build-image`, `frontend:build-image` | Docker BuildKit, pushed to the GitLab container registry |
 | `verify` | The images just built | `e2e:test-playwright` | Playwright, desktop and mobile, against the full stack running those images |
 | | | `security:scan-image-trivy` | Trivy: vulnerabilities and secrets in each image, and its SBOM |
+| `publish` | Deployment tags | `backend:publish-image`, `frontend:publish-image` | crane: `main` and `main-<short sha>` on the verified images (default branch) |
+| | | `backend:promote-image`, `frontend:promote-image` | crane: version tag on the image verified on `main` (release tags only) |
 
 Job names follow `<component>:<action>-<tool>`: what the job does and with which tool, grouped
 by component in the graph.
@@ -133,7 +137,8 @@ Images are pushed to the project's container registry:
 `registry.gitlab.com/stateofflowhunter/votely/<component>:<commit SHA>`.
 
 - **Immutable tags**: the full commit SHA identifies exactly what was built. Deployment tags
-  (`main`, versions) are added later, after the images have been tested.
+  (`main`, versions) are only added once the images have passed the `verify` stage (see
+  below).
 - **Never untested**: each build job `needs` the tests of its component, so a failing test stops
   the image from being published.
 - **Both images, or none**: build jobs run when any application path changes (`.rules:app`), so
@@ -148,6 +153,45 @@ Images are pushed to the project's container registry:
 
 Builds use Docker-in-Docker with BuildKit (`docker buildx`), the standard setup on GitLab.com
 shared runners.
+
+## Publishing and releases
+
+Images are **built once and promoted**: a release never rebuilds anything, it gives a version
+number to an image that was already verified on `main`.
+
+```mermaid
+flowchart LR
+    build["build<br/>:&lt;sha&gt;"] --> verify["verify<br/>e2e + scan"] --> publish["publish<br/>:main-&lt;short sha&gt;<br/>:main"]
+    tag(["git tag v1.2.0"]) --> promote["promote<br/>:1.2.0"]
+    publish -. same digest .-> promote
+```
+
+| Tag | Added by | Points to |
+|---|---|---|
+| `<commit sha>` | `*:build-image`, every pipeline | a build, verified or not (merge requests too) |
+| `main-<short sha>` | `*:publish-image`, default branch | the image of that commit, **verified** by the whole pipeline |
+| `main` | `*:publish-image`, default branch | the latest verified image (staging) |
+| `1.2.0` | `*:promote-image`, release tag `v1.2.0` | the same digest as `main-<short sha>` (production) |
+
+- **What runs in production is what was tested**, byte for byte: same digest as the image that
+  went through the end-to-end tests, the scans and staging. A rebuild would pull newer base
+  images and packages, and produce a different, untested image.
+- `main-<short sha>` is only added after `verify`, so its existence proves the image was
+  verified. The promotion job looks for it: tagging a commit that is not on `main`, or whose
+  pipeline failed, makes the release pipeline fail with an explicit message.
+- Tags are added in the registry with [crane](https://github.com/google/go-containerregistry/tree/main/cmd/crane):
+  no Docker daemon, nothing pulled, a few seconds per image.
+- Release pipelines run nothing else: the commit was already checked on `main`.
+
+To release, once the `main` pipeline of the commit has passed:
+
+```bash
+git tag -a v1.2.0 -m "v1.2.0"
+git push origin v1.2.0
+```
+
+The registry cleanup policy keeps version tags, `main` and the build cache; older commit images
+are removed after 14 days, so a commit should be released within that time.
 
 ## End-to-end tests
 

@@ -23,6 +23,8 @@ security:secrets-gitleaks:
     expire_in: 1 week
     reports:
       junit: gitleaks-junit.xml
+  rules:
+    - !reference [.rules:checks, rules]
 
 security:sast-semgrep:
   stage: analyze
@@ -44,6 +46,8 @@ security:sast-semgrep:
     paths: [semgrep.sarif]
     reports:
       junit: semgrep-junit.xml
+  rules:
+    - !reference [.rules:checks, rules]
 
 security:deps-trivy:
   stage: analyze
@@ -68,6 +72,8 @@ security:deps-trivy:
     paths: [trivy-deps.json]
     reports:
       junit: trivy-deps-junit.xml
+  rules:
+    - !reference [.rules:checks, rules]
 
 security:scan-image-trivy:
   # The images built by this pipeline, by digest: what is scanned is what will be deployed.
