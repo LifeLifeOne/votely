@@ -13,14 +13,15 @@ Pipelines: https://gitlab.com/StateOfFlowHunter/votely/-/pipelines
 ├── templates.gitlab-ci.yml     # shared building blocks (Docker build, rules)
 ├── backend.gitlab-ci.yml       # backend:* jobs
 ├── frontend.gitlab-ci.yml      # frontend:* jobs
-└── e2e.gitlab-ci.yml           # e2e:* jobs
+├── e2e.gitlab-ci.yml           # e2e:* jobs
+└── security.gitlab-ci.yml      # security:* jobs
 ```
 
 - One file per component: everything that concerns the backend pipeline is in one place, while
   the stages are declared once in `.gitlab-ci.yml`.
 - The `.gitlab-ci.yml` suffix lets editors and the GitLab tooling recognise and validate the files.
-- Jobs are named `<component>:<action>` (`backend:lint`, `frontend:lint`), so the pipeline graph
-  reads at a glance.
+- Jobs are named `<component>:<action>-<tool>` (`backend:lint-ruff`, `frontend:test-vitest`), so
+  the pipeline graph reads at a glance.
 - Each file starts with a hidden job (`.backend`, `.frontend`, `.e2e`) holding the image, cache
   and rules shared by the component's jobs, which `extends` it.
 
@@ -37,25 +38,74 @@ Filtering merge request jobs by changed paths keeps pipelines fast and saves CI 
 always runs everything, so the default branch is always fully verified.
 
 A new push cancels the running pipeline of the same branch (`interruptible` jobs). Jobs are
-retried once on infrastructure failures only, never on a failing test or lint.
+retried once on infrastructure failures only, never on a failing test or check.
 
 ## Stages
 
-| Stage | Job | What it checks |
+```
+.pre      security:secrets-gitleaks
+analyze   backend:lint-ruff  frontend:lint-oxlint  frontend:format-prettier  frontend:typecheck-tsc
+          e2e:format-prettier  e2e:typecheck-tsc  security:sast-semgrep  security:deps-trivy
+test      backend:test-pytest  frontend:test-vitest
+build     backend:build-image  frontend:build-image
+verify    e2e:test-playwright
+```
+
+| Stage | Purpose | Job | Tool and scope |
+|---|---|---|---|
+| `.pre` | Gate: always first | `security:secrets-gitleaks` | gitleaks: secrets in the new commits (merge requests) or the whole history (default branch) |
+| `analyze` | Source code, without running it | `backend:lint-ruff` | ruff: lint and security rules (Bandit), import order, formatting |
+| | | `frontend:lint-oxlint` | oxlint (warnings fail the job) |
+| | | `frontend:format-prettier`, `e2e:format-prettier` | Prettier |
+| | | `frontend:typecheck-tsc`, `e2e:typecheck-tsc` | TypeScript compiler, strict mode |
+| | | `security:sast-semgrep` | Semgrep: Python, TypeScript, React, OWASP Top 10 and Dockerfile rulesets |
+| | | `security:deps-trivy` | Trivy: known vulnerabilities in the production dependencies (`uv.lock`, `package-lock.json`) |
+| `test` | Running the code | `backend:test-pytest` | pytest: unit and integration tests against a PostgreSQL 16 service, migrations included; coverage ≥ 90 % |
+| | | `frontend:test-vitest` | Vitest: components and pages against a fake API (MSW); coverage ≥ 80 % of lines |
+| `build` | Production images | `backend:build-image`, `frontend:build-image` | Docker BuildKit, pushed to the GitLab container registry |
+| `verify` | The images just built | `e2e:test-playwright` | Playwright, desktop and mobile, against the full stack running those images |
+
+Job names follow `<component>:<action>-<tool>`: what the job does and with which tool, grouped
+by component in the graph.
+
+Each test job only waits for the checks of its own component (`needs`), so a slow frontend
+check never delays the backend tests.
+
+`backend:test-pytest` runs with `CI=true` (always defined by GitLab): if PostgreSQL were
+unreachable, the integration tests would fail instead of being skipped as they are locally.
+
+## Security checks
+
+Checks that only need the source code run first; the scan of the images (once built) comes in
+the `verify` stage.
+
+| Job | Finds | Fails when |
 |---|---|---|
-| `lint` | `backend:lint` | ruff (lint rules, import order) and ruff format |
-| | `frontend:lint` | oxlint (warnings fail the job), Prettier, TypeScript |
-| | `e2e:lint` | Prettier, TypeScript |
-| `test` | `backend:test` | pytest: unit and integration tests against a PostgreSQL 16 service, migrations included; coverage ≥ 90 % |
-| | `frontend:test` | Vitest: components and pages against a fake API (MSW); coverage ≥ 80 % of lines |
-| `build` | `backend:build`, `frontend:build` | Production images built and pushed to the GitLab container registry |
-| `e2e` | `e2e:test` | Playwright, desktop and mobile, against the full stack running the images just built |
+| `security:secrets-gitleaks` | Passwords, tokens and keys committed to Git | any secret is found |
+| `security:sast-semgrep` | Vulnerable code patterns in our code (injection, unsafe headers, weak crypto…) | any finding |
+| `backend:lint-ruff` (`S` rules) | Python-specific risky calls (`eval`, `subprocess` with a shell, hardcoded passwords…) | any finding outside `tests/` |
+| `security:deps-trivy` | Known CVEs in the production dependencies | a HIGH or CRITICAL vulnerability **with a fix available** |
 
-Each test job only waits for the lint job of its own component (`needs`), so a slow frontend lint
-never delays the backend tests.
+- Only fixable dependency vulnerabilities fail the pipeline: they are the ones we can act on
+  (upgrade); the others are listed in the `trivy-deps.json` artifact. Development dependencies
+  (Vite, Vitest, Playwright) are not part of the images and are not scanned.
+- Every finding is also written as **JUnit**, so it appears as a failed test in the pipeline
+  *Tests* tab and in the merge request widget. GitLab's native security widgets require the
+  Ultimate tier; full reports (SARIF, JSON) are kept as artifacts.
+- The first Semgrep run found that nginx forwarded the client's `Host` header to the API (an
+  attacker-controlled value); it is no longer forwarded.
 
-`backend:test` sets `CI=true` (always defined by GitLab): if PostgreSQL were unreachable, the
-integration tests would fail instead of being skipped as they are locally.
+### Defence in depth for secrets
+
+A pipeline starts **after** the push: by then a leaked secret is already public (and mirrored).
+The CI job limits the damage, it cannot prevent the leak. Several layers are therefore combined:
+
+| Layer | When | How |
+|---|---|---|
+| 1. Prevention | Before the commit | gitleaks pre-commit hook (`uvx pre-commit install`) |
+| 2. Push protection | The push is refused | GitHub push protection on the mirror; GitLab secret push protection (Ultimate) |
+| 3. Detection | After the push | `security:secrets-gitleaks`, which stops the pipeline: nothing is built or deployed |
+| 4. Response | As soon as detected | **Revoke and rotate the secret.** Rewriting Git history is not enough: public repositories are scraped within minutes |
 
 ## Container images
 
@@ -81,7 +131,7 @@ shared runners.
 
 ## End-to-end tests
 
-`e2e:test` runs the same disposable stack as on a laptop (`compose.yaml` + `compose.e2e.yaml`),
+`e2e:test-playwright` runs the same disposable stack as on a laptop (`compose.yaml` + `compose.e2e.yaml`),
 inside Docker-in-Docker, with the **exact images built by the pipeline**: the build jobs' digests
 (`BACKEND_IMAGE`, `FRONTEND_IMAGE`) are passed to Compose through `VOTELY_BACKEND_IMAGE` and
 `VOTELY_FRONTEND_IMAGE`. What is tested is byte for byte what will be deployed.
