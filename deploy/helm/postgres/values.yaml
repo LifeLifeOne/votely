@@ -1,0 +1,21 @@
+image:
+  repository: postgres
+  tag: 16-alpine
+
+# Credentials are never set in values: they come from an existing Secret with the keys
+# `username`, `password` and `database` (created by deploy/kind/up.sh locally, by Sealed Secrets
+# on the server). The application reads the same Secret.
+auth:
+  existingSecret: votely-db
+
+storage:
+  size: 1Gi
+  # Empty: the cluster's default storage class.
+  storageClassName: ""
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
