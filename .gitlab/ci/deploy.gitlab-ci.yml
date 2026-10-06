@@ -1,0 +1,41 @@
+# Kubernetes packaging: the Helm charts in deploy/helm/.
+
+.deploy:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - deploy/**/*
+        - .gitlab-ci.yml
+        - .gitlab/ci/deploy.gitlab-ci.yml
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+deploy:lint-helm:
+  extends: .deploy
+  stage: analyze
+  image:
+    name: alpine/helm:4.3.0
+    entrypoint: [""]
+  script:
+    # Chart structure and best practices; --strict fails on warnings too.
+    - helm lint --strict deploy/helm/postgres
+    - helm lint --strict deploy/helm/votely --values deploy/helm/votely/values-kind.yaml
+    # Render every chart with its values files for the schema validation job.
+    - mkdir rendered
+    - helm template postgres deploy/helm/postgres > rendered/postgres.yaml
+    - helm template votely deploy/helm/votely > rendered/votely.yaml
+    - helm template votely deploy/helm/votely --values deploy/helm/votely/values-kind.yaml > rendered/votely-kind.yaml
+  artifacts:
+    expire_in: 1 week
+    paths: [rendered/]
+
+deploy:validate-kubeconform:
+  extends: .deploy
+  stage: analyze
+  needs: [deploy:lint-helm]
+  image:
+    name: ghcr.io/yannh/kubeconform:v0.8.0-alpine
+    entrypoint: [""]
+  script:
+    # Every rendered manifest against the Kubernetes API schemas of the cluster version (k3s
+    # stable channel): unknown or misspelled fields fail the job instead of the deployment.
+    - /kubeconform -strict -summary -kubernetes-version 1.36.4 rendered/

@@ -14,7 +14,8 @@ Pipelines: https://gitlab.com/StateOfFlowHunter/votely/-/pipelines
 ├── backend.gitlab-ci.yml       # backend:* jobs
 ├── frontend.gitlab-ci.yml      # frontend:* jobs
 ├── e2e.gitlab-ci.yml           # e2e:* jobs
-└── security.gitlab-ci.yml      # security:* jobs
+├── security.gitlab-ci.yml      # security:* jobs
+└── deploy.gitlab-ci.yml        # deploy:* jobs (Helm charts)
 ```
 
 - One file per component: everything that concerns the backend pipeline is in one place, while
@@ -47,6 +48,7 @@ retried once on infrastructure failures only, never on a failing test or check.
 .pre      security:secrets-gitleaks
 analyze   backend:lint-ruff  frontend:lint-oxlint  frontend:format-prettier  frontend:typecheck-tsc
           e2e:format-prettier  e2e:typecheck-tsc  security:sast-semgrep  security:deps-trivy
+          deploy:lint-helm  deploy:validate-kubeconform
 test      backend:test-pytest  frontend:test-vitest
 build     backend:build-image  frontend:build-image
 verify    e2e:test-playwright  security:scan-image-trivy: [backend, frontend]
@@ -62,6 +64,7 @@ publish   backend:publish-image  frontend:publish-image     (release tags: *:pro
 | | | `frontend:typecheck-tsc`, `e2e:typecheck-tsc` | TypeScript compiler, strict mode |
 | | | `security:sast-semgrep` | Semgrep: Python, TypeScript, React, OWASP Top 10 and Dockerfile rulesets |
 | | | `security:deps-trivy` | Trivy: known vulnerabilities in the production dependencies (`uv.lock`, `package-lock.json`) |
+| | | `deploy:lint-helm`, `deploy:validate-kubeconform` | Helm lint (strict), then every rendered manifest validated against the Kubernetes API schemas |
 | `test` | Running the code | `backend:test-pytest` | pytest: unit and integration tests against a PostgreSQL 16 service, migrations included; coverage ≥ 90 % |
 | | | `frontend:test-vitest` | Vitest: components and pages against a fake API (MSW); coverage ≥ 80 % of lines |
 | `build` | Production images | `backend:build-image`, `frontend:build-image` | Docker BuildKit, pushed to the GitLab container registry |
