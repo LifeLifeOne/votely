@@ -1,0 +1,76 @@
+# Infrastructure as code (Terraform stacks in infra/terraform/): checks on every merge request,
+# and a read-only plan so reviewers see what would change on AWS. Applies are run by a person.
+
+.infra:
+  image:
+    name: hashicorp/terraform:1.16
+    entrypoint: [""]
+  variables:
+    TF_IN_AUTOMATION: "true"
+    TF_INPUT: "false"
+    TF_PLUGIN_CACHE_DIR: $CI_PROJECT_DIR/.cache/terraform
+    STACKS: bootstrap server
+  cache:
+    key: infra
+    paths: [.cache/terraform]
+  before_script:
+    - mkdir -p "$TF_PLUGIN_CACHE_DIR"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - infra/**/*
+        - .gitlab-ci.yml
+        - .gitlab/ci/infra.gitlab-ci.yml
+        - .gitlab/ci/templates.gitlab-ci.yml
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+infra:format-terraform:
+  extends: .infra
+  stage: analyze
+  script:
+    - terraform fmt -check -recursive -diff infra/terraform
+
+infra:validate-terraform:
+  extends: .infra
+  stage: analyze
+  script:
+    # Without backend: syntax, types and references only, no AWS access needed.
+    - |
+      for stack in $STACKS; do
+        terraform -chdir="infra/terraform/$stack" init -backend=false
+        terraform -chdir="infra/terraform/$stack" validate
+      done
+
+infra:lint-tflint:
+  extends: .infra
+  stage: analyze
+  image:
+    name: ghcr.io/terraform-linters/tflint:v0.64.0
+    entrypoint: [""]
+  before_script: []
+  script:
+    - tflint --init --config="$CI_PROJECT_DIR/infra/terraform/.tflint.hcl"
+    - |
+      for stack in $STACKS; do
+        tflint --chdir="infra/terraform/$stack" --config="$CI_PROJECT_DIR/infra/terraform/.tflint.hcl"
+      done
+
+infra:plan-terraform:
+  extends: [.infra, .aws]
+  stage: analyze
+  needs: [infra:validate-terraform]
+  variables:
+    AWS_ROLE_ARN: arn:aws:iam::${AWS_ACCOUNT_ID}:role/votely-ci-plan
+  before_script:
+    - !reference [.infra, before_script]
+    - !reference [.aws, before_script]
+  script:
+    # Read-only role: no state lock (it would need write access), nothing can be applied.
+    # The plan is only printed: a saved plan file would hold sensitive values in clear text.
+    # AWS_ACCOUNT_ID and TF_VAR_budget_email are masked CI/CD variables, hidden in this log.
+    - |
+      for stack in $STACKS; do
+        echo "=== $stack"
+        terraform -chdir="infra/terraform/$stack" init
+        terraform -chdir="infra/terraform/$stack" plan -lock=false
+      done

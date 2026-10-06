@@ -75,6 +75,19 @@
   rules:
     - !reference [.rules:app, rules]
 
+# AWS access through OpenID Connect: GitLab signs a short-lived token describing the job
+# (project, branch), AWS exchanges it for temporary credentials of the role in AWS_ROLE_ARN.
+# The AWS SDKs (Terraform, Cosign) read these two variables natively. No key is stored.
+.aws:
+  id_tokens:
+    AWS_ID_TOKEN:
+      aud: sts.amazonaws.com
+  variables:
+    AWS_REGION: eu-west-1
+    AWS_WEB_IDENTITY_TOKEN_FILE: /tmp/aws-web-identity-token
+  before_script:
+    - printf '%s' "$AWS_ID_TOKEN" > "$AWS_WEB_IDENTITY_TOKEN_FILE"
+
 # Registry client that adds tags to an image in place (no pull, no rebuild), logged in to the
 # project's container registry with the job token.
 .crane:
