@@ -13,11 +13,12 @@ workflow:
     # A new push cancels the outdated pipeline of the same branch.
     on_new_commit: interruptible
 
+# Columns of the pipeline graph (.pre always runs first: secrets scan).
 stages:
-  - lint
-  - test
-  - build
-  - e2e
+  - analyze # source code, without running it: lint, types, security
+  - test # unit and integration tests
+  - build # production images
+  - verify # the images just built: end-to-end tests, vulnerability scan
 
 default:
   interruptible: true
@@ -31,3 +32,4 @@ include:
   - local: .gitlab/ci/backend.gitlab-ci.yml
   - local: .gitlab/ci/frontend.gitlab-ci.yml
   - local: .gitlab/ci/e2e.gitlab-ci.yml
+  - local: .gitlab/ci/security.gitlab-ci.yml

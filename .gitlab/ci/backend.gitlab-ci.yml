@@ -22,18 +22,18 @@
         - .gitlab/ci/backend.gitlab-ci.yml
     - if: $CI_PIPELINE_SOURCE != "merge_request_event"
 
-backend:lint:
+backend:lint-ruff:
   extends: .backend
-  stage: lint
+  stage: analyze
   script:
     - uv run ruff check .
     - uv run ruff format --check .
 
-backend:test:
+backend:test-pytest:
   extends: .backend
   stage: test
   # Start as soon as the backend is linted, without waiting for the other components.
-  needs: [backend:lint]
+  needs: [backend:lint-ruff]
   services:
     # Real PostgreSQL: integration tests and migrations run against the same engine as production.
     - name: postgres:16-alpine
@@ -56,7 +56,7 @@ backend:test:
         coverage_format: cobertura
         path: backend/coverage.xml
 
-backend:build:
+backend:build-image:
   extends: .docker-build
   stage: build
   variables:
@@ -64,5 +64,5 @@ backend:build:
   # Never publish an image whose tests failed. Optional: on a merge request that only touches
   # the other component, the tests are skipped but the image is still rebuilt for e2e.
   needs:
-    - job: backend:test
+    - job: backend:test-pytest
       optional: true

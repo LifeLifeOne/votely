@@ -19,18 +19,23 @@
         - .gitlab/ci/e2e.gitlab-ci.yml
     - if: $CI_PIPELINE_SOURCE != "merge_request_event"
 
-e2e:lint:
+e2e:format-prettier:
   extends: .e2e
-  stage: lint
+  stage: analyze
   script:
     - npm run format:check
+
+e2e:typecheck-tsc:
+  extends: .e2e
+  stage: analyze
+  script:
     - npm run typecheck
 
-e2e:test:
+e2e:test-playwright:
   extends: .docker
-  stage: e2e
+  stage: verify
   # The two images built by this pipeline, by digest (BACKEND_IMAGE, FRONTEND_IMAGE dotenv).
-  needs: [backend:build, frontend:build]
+  needs: [backend:build-image, frontend:build-image]
   variables:
     PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble
     COMPOSE: docker compose -p votely-e2e -f compose.yaml -f compose.e2e.yaml

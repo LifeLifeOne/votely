@@ -1,0 +1,69 @@
+# Security checks on the source code: secrets, code vulnerabilities (SAST) and vulnerable
+# dependencies (SCA). Every finding is also written as JUnit, so it shows up in the pipeline
+# Tests tab and the merge request widget (GitLab Free has no security widget).
+
+security:secrets-gitleaks:
+  # .pre runs before every other stage: nothing is tested or built if a secret is found.
+  stage: .pre
+  image:
+    name: zricethezav/gitleaks:v8.30.1
+    entrypoint: [""]
+  variables:
+    GIT_DEPTH: 0 # the whole history is needed to scan past commits
+  script:
+    # Merge requests: only the new commits. Default branch and tags: the whole history.
+    - |
+      if [ -n "$CI_MERGE_REQUEST_DIFF_BASE_SHA" ]; then
+        set -- --log-opts="$CI_MERGE_REQUEST_DIFF_BASE_SHA..$CI_COMMIT_SHA"
+      fi
+      gitleaks git . --redact --verbose --report-format junit --report-path gitleaks-junit.xml "$@"
+  artifacts:
+    when: always
+    expire_in: 1 week
+    reports:
+      junit: gitleaks-junit.xml
+
+security:sast-semgrep:
+  stage: analyze
+  image:
+    name: semgrep/semgrep:1.179.0
+    entrypoint: [""]
+  script:
+    # The image expects the code mounted on /src (docker run usage); in CI it is the job directory.
+    - unset SEMGREP_IN_DOCKER
+    # Community rulesets for our languages and the OWASP Top 10. --error fails the job on findings.
+    - >
+      semgrep scan --metrics=off --error
+      --config p/python --config p/typescript --config p/react
+      --config p/owasp-top-ten --config p/dockerfile
+      --junit-xml-output=semgrep-junit.xml --sarif-output=semgrep.sarif --text
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths: [semgrep.sarif]
+    reports:
+      junit: semgrep-junit.xml
+
+security:deps-trivy:
+  stage: analyze
+  image:
+    name: aquasec/trivy:0.75.0
+    entrypoint: [""]
+  variables:
+    TRIVY_CACHE_DIR: $CI_PROJECT_DIR/.cache/trivy
+    TRIVY_NO_PROGRESS: "true"
+  cache:
+    key: trivy
+    paths: [.cache/trivy]
+  script:
+    # Production dependencies from the lockfiles (uv.lock, package-lock.json). Only
+    # vulnerabilities with a fix available fail the job: they are the ones we can act on.
+    - trivy fs . --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --format json --output trivy-deps.json
+    - trivy convert --format template --template "@/contrib/junit.tpl" --output trivy-deps-junit.xml trivy-deps.json
+    - trivy convert --format table --scanners vuln --exit-code 1 trivy-deps.json
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths: [trivy-deps.json]
+    reports:
+      junit: trivy-deps-junit.xml

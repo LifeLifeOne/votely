@@ -18,18 +18,28 @@
         - .gitlab/ci/frontend.gitlab-ci.yml
     - if: $CI_PIPELINE_SOURCE != "merge_request_event"
 
-frontend:lint:
+frontend:lint-oxlint:
   extends: .frontend
-  stage: lint
+  stage: analyze
   script:
     - npm run lint
+
+frontend:format-prettier:
+  extends: .frontend
+  stage: analyze
+  script:
     - npm run format:check
+
+frontend:typecheck-tsc:
+  extends: .frontend
+  stage: analyze
+  script:
     - npm run typecheck
 
-frontend:test:
+frontend:test-vitest:
   extends: .frontend
   stage: test
-  needs: [frontend:lint]
+  needs: [frontend:lint-oxlint, frontend:typecheck-tsc]
   script:
     - >
       npx vitest run --coverage
@@ -45,7 +55,7 @@ frontend:test:
         coverage_format: cobertura
         path: frontend/coverage/cobertura-coverage.xml
 
-frontend:build:
+frontend:build-image:
   extends: .docker-build
   stage: build
   variables:
@@ -53,5 +63,5 @@ frontend:build:
   # Never publish an image whose tests failed. Optional: on a merge request that only touches
   # the other component, the tests are skipped but the image is still rebuilt for e2e.
   needs:
-    - job: frontend:test
+    - job: frontend:test-vitest
       optional: true
