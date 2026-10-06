@@ -2,13 +2,14 @@
 
 workflow:
   rules:
-    # One pipeline per change: merge request pipelines, the default branch and tags.
+    # One pipeline per change: merge request pipelines and the default branch. Release tags
+    # (vX.Y.Z) get a pipeline that only promotes the images already verified on main.
     # Branch pipelines are skipped while a merge request is open, to avoid duplicates.
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
   auto_cancel:
     # A new push cancels the outdated pipeline of the same branch.
     on_new_commit: interruptible
@@ -19,6 +20,7 @@ stages:
   - test # unit and integration tests
   - build # production images
   - verify # the images just built: end-to-end tests, vulnerability scan
+  - publish # deployment tags on the verified images
 
 default:
   interruptible: true

@@ -12,7 +12,14 @@
         - compose*.yaml
         - .gitlab-ci.yml
         - .gitlab/ci/**/*
-    - if: $CI_PIPELINE_SOURCE != "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# Merge requests and the default branch. Release tag pipelines run no checks: they promote
+# images that were already verified on the default branch.
+.rules:checks:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 # Docker-in-Docker client, logged in to the project's container registry with the job token.
 .docker:
@@ -67,3 +74,43 @@
       dotenv: build.env
   rules:
     - !reference [.rules:app, rules]
+
+# Registry client that adds tags to an image in place (no pull, no rebuild), logged in to the
+# project's container registry with the job token.
+.crane:
+  stage: publish
+  image:
+    name: gcr.io/go-containerregistry/crane/debug:v0.22.1
+    entrypoint: [""]
+  variables:
+    GIT_STRATEGY: none # only the registry is needed
+    IMAGE: $CI_REGISTRY_IMAGE/$COMPONENT
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | crane auth login "$CI_REGISTRY" --username "$CI_REGISTRY_USER" --password-stdin
+
+# Default branch: tag the image verified by this pipeline (digest from the build job).
+#   main-<short sha>  this commit's verified image, the one a release promotes
+#   main              the latest verified image
+.publish-image:
+  extends: .crane
+  script:
+    - VERIFIED=$(printenv "$(echo "$COMPONENT" | tr a-z A-Z)_IMAGE")
+    - crane tag "$VERIFIED" "main-$CI_COMMIT_SHORT_SHA"
+    - crane tag "$VERIFIED" main
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# Release tag vX.Y.Z: nothing is rebuilt. The image verified on the default branch for this
+# commit gets the version tag X.Y.Z, so production runs exactly what was tested.
+.promote-image:
+  extends: .crane
+  needs: []
+  script:
+    - |
+      if ! crane digest "$IMAGE:main-$CI_COMMIT_SHORT_SHA" > /dev/null; then
+        echo "No verified image for $CI_COMMIT_SHORT_SHA: tag a commit of $CI_DEFAULT_BRANCH once its pipeline has passed."
+        exit 1
+      fi
+    - crane tag "$IMAGE:main-$CI_COMMIT_SHORT_SHA" "${CI_COMMIT_TAG#v}"
+  rules:
+    - if: $CI_COMMIT_TAG

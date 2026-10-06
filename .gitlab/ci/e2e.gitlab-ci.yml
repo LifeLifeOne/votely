@@ -17,7 +17,7 @@
         - compose*.yaml
         - .gitlab-ci.yml
         - .gitlab/ci/e2e.gitlab-ci.yml
-    - if: $CI_PIPELINE_SOURCE != "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 e2e:format-prettier:
   extends: .e2e
