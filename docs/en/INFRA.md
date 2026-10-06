@@ -9,7 +9,7 @@ look.
 ```
 infra/terraform/
 ├── .tflint.hcl     # lint rules shared by every stack (Terraform + AWS rulesets)
-├── bootstrap/      # kept: state bucket, budget alert, permanent public IP
+├── bootstrap/      # kept: state bucket, budget alert, public IP, CI access, signing key
 └── server/         # created and destroyed at will: network, firewall, server
 ```
 
@@ -35,6 +35,7 @@ once and kept, the server is created and destroyed at will.
 |---|---|---|
 | A person | IAM Identity Center: access portal with password + MFA, temporary credentials for the CLI | none |
 | The root user | Only for the few account-level tasks that require it; protected by MFA | – |
+| GitLab CI | OpenID Connect: a token signed by GitLab for each job, exchanged for a temporary role | none |
 
 The CLI uses an SSO profile (`~/.aws/config`, outside the repository):
 
@@ -147,6 +148,45 @@ from the official `.deb` (`session-manager-plugin.deb`) into `~/.local/bin`.
 A newer Amazon Linux image is picked up each time the server is recreated; a running server is
 never replaced because a new image was published (`ignore_changes = [ami]`).
 
+## CI access (OpenID Connect)
+
+GitLab CI needs AWS for two things: a read-only `terraform plan` in merge requests, and signing
+images. No AWS key is stored in GitLab:
+
+1. GitLab signs a short-lived token for the job (`id_tokens`), stating which project and which
+   branch it runs for (`project_path:StateOfFlowHunter/votely:ref_type:branch:ref:<branch>`).
+2. AWS checks the signature against the GitLab OpenID Connect provider declared in the
+   bootstrap stack, and the subject against the role's trust policy.
+3. AWS returns credentials valid one hour; the AWS SDKs read them through `AWS_ROLE_ARN` and
+   `AWS_WEB_IDENTITY_TOKEN_FILE`.
+
+| Role | Who may assume it | Permissions |
+|---|---|---|
+| `votely-ci-plan` | Any branch of the project (merge requests) | `ReadOnlyAccess`: can see, never change |
+| `votely-ci-signer` | The default branch only | `kms:Sign` and `kms:GetPublicKey` on the Cosign key, nothing else |
+
+- **Forks cannot use them**: a fork's pipelines carry the fork's project path in their token.
+  The project setting that runs fork merge requests in the parent project stays disabled.
+- **Applies stay manual**: no CI role can create, change or delete anything; changes are
+  reviewed in the merge request plan, then applied by a person.
+- **The plan is public but discreet**: the account ID and the budget email are masked CI/CD
+  variables (`AWS_ACCOUNT_ID`, `TF_VAR_budget_email`), shown as `[MASKED]` in job logs, and no
+  plan file is kept as an artifact (it would hold sensitive values in clear text). The plan
+  runs without a state lock, which would need write access.
+
+## Image signing key
+
+`alias/votely-cosign` is an asymmetric AWS KMS key (ECDSA P-256, `SIGN_VERIFY`) used by Cosign
+in the CI ([CI.md](CI.md#signed-images)). The private key cannot be exported; the public key is
+committed as [`cosign.pub`](../../cosign.pub):
+
+```bash
+cosign public-key --key awskms:///alias/votely-cosign > cosign.pub
+```
+
+The key is protected by `prevent_destroy` and a 30-day deletion window: deleting it by mistake
+would make every existing signature unverifiable.
+
 ## Checks
 
 ```bash
@@ -170,6 +210,8 @@ the CI use the same provider builds.
 | Budget alert | free (the first two budgets of an account are free) |
 | Elastic IP, kept between sessions | ~0.005 USD per hour, ~3.60 USD per month |
 | Server (`t3a.large` + 30 GiB disk) while it runs | ~0.09 USD per hour, ~0.70 USD for an 8-hour session |
+| Signing key (KMS) | 1 USD per month, plus a few cents per 10,000 signatures |
+| CI roles and OpenID Connect provider | free |
 
 The server only runs during work sessions: `terraform destroy` in `server/` stops its cost, and
 the budget alert reports any oversight.

@@ -119,7 +119,7 @@ uvx pre-commit install  # git hooks (lint + secret scanning)
 - [Tests](docs/en/TESTS.md): testing strategy, end-to-end tests, how to watch them
 - [Continuous integration](docs/en/CI.md): pipeline layout, rules, stages, releases
 - [Kubernetes](docs/en/KUBERNETES.md): Helm charts, local cluster, migrations, security settings
-- [Infrastructure](docs/en/INFRA.md): AWS access, Terraform state, network and server, costs
+- [Infrastructure](docs/en/INFRA.md): AWS access, Terraform state, network and server, CI access, signing key, costs
 
 ## License
 

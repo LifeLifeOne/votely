@@ -9,7 +9,7 @@ regarder.
 ```
 infra/terraform/
 ├── .tflint.hcl     # règles de lint communes à toutes les stacks (Terraform + AWS)
-├── bootstrap/      # conservé : bucket du state, alerte budget, IP publique permanente
+├── bootstrap/      # conservé : bucket du state, alerte budget, IP publique, accès CI, clé de signature
 └── server/         # créé et détruit à volonté : réseau, pare-feu, serveur
 ```
 
@@ -35,6 +35,7 @@ bootstrap est créé une fois et conservé, le serveur est créé et détruit à
 |---|---|---|
 | Une personne | IAM Identity Center : portail d'accès avec mot de passe + MFA, identifiants temporaires pour la CLI | aucun |
 | L'utilisateur root | Uniquement pour les rares tâches de compte qui l'exigent ; protégé par MFA | – |
+| GitLab CI | OpenID Connect : un jeton signé par GitLab pour chaque job, échangé contre un rôle temporaire | aucun |
 
 La CLI utilise un profil SSO (`~/.aws/config`, en dehors du dépôt) :
 
@@ -148,6 +149,47 @@ du `.deb` officiel (`session-manager-plugin.deb`) dans `~/.local/bin`.
 Une image Amazon Linux plus récente est prise à chaque recréation du serveur ; un serveur en
 marche n'est jamais remplacé parce qu'une nouvelle image est sortie (`ignore_changes = [ami]`).
 
+## Accès de la CI (OpenID Connect)
+
+La CI GitLab a besoin d'AWS pour deux choses : un `terraform plan` en lecture seule dans les
+merge requests, et la signature des images. Aucune clé AWS n'est stockée dans GitLab :
+
+1. GitLab signe un jeton de courte durée pour le job (`id_tokens`), qui indique pour quel projet
+   et quelle branche il tourne (`project_path:StateOfFlowHunter/votely:ref_type:branch:ref:<branche>`).
+2. AWS vérifie la signature auprès du fournisseur OpenID Connect de GitLab déclaré dans la stack
+   bootstrap, et le sujet auprès de la politique de confiance du rôle.
+3. AWS renvoie des identifiants valables une heure ; les SDK AWS les lisent via `AWS_ROLE_ARN` et
+   `AWS_WEB_IDENTITY_TOKEN_FILE`.
+
+| Rôle | Qui peut l'utiliser | Droits |
+|---|---|---|
+| `votely-ci-plan` | Toute branche du projet (merge requests) | `ReadOnlyAccess` : voir, jamais modifier |
+| `votely-ci-signer` | La branche principale uniquement | `kms:Sign` et `kms:GetPublicKey` sur la clé Cosign, rien d'autre |
+
+- **Les forks ne peuvent pas les utiliser** : les pipelines d'un fork portent le chemin du fork
+  dans leur jeton. Le réglage qui ferait tourner les merge requests de forks dans le projet
+  parent reste désactivé.
+- **Les apply restent manuels** : aucun rôle de CI ne peut créer, modifier ou supprimer quoi que
+  ce soit ; les changements sont relus dans le plan de la merge request, puis appliqués par une
+  personne.
+- **Le plan est public mais discret** : l'identifiant du compte et l'email du budget sont des
+  variables CI/CD masquées (`AWS_ACCOUNT_ID`, `TF_VAR_budget_email`), affichées `[MASKED]` dans
+  les logs, et aucun fichier de plan n'est gardé en artefact (il contiendrait des valeurs
+  sensibles en clair). Le plan tourne sans verrou du state, qui demanderait un accès en écriture.
+
+## Clé de signature des images
+
+`alias/votely-cosign` est une clé AWS KMS asymétrique (ECDSA P-256, `SIGN_VERIFY`) utilisée par
+Cosign dans la CI ([CI.md](CI.md#images-signées)). La clé privée ne peut pas être exportée ; la clé
+publique est commitée dans [`cosign.pub`](../../cosign.pub) :
+
+```bash
+cosign public-key --key awskms:///alias/votely-cosign > cosign.pub
+```
+
+La clé est protégée par `prevent_destroy` et un délai de suppression de 30 jours : la supprimer
+par erreur rendrait invérifiables toutes les signatures existantes.
+
 ## Vérifications
 
 ```bash
@@ -171,6 +213,8 @@ machine et la CI utilisent les mêmes builds.
 | Alerte budget | gratuite (les deux premiers budgets d'un compte sont gratuits) |
 | Elastic IP, conservée entre les sessions | ~0,005 USD de l'heure, ~3,60 USD par mois |
 | Serveur (`t3a.large` + disque de 30 Gio) quand il tourne | ~0,09 USD de l'heure, ~0,70 USD pour une session de 8 heures |
+| Clé de signature (KMS) | 1 USD par mois, plus quelques centimes pour 10 000 signatures |
+| Rôles de CI et fournisseur OpenID Connect | gratuits |
 
 Le serveur ne tourne que pendant les sessions de travail : `terraform destroy` dans `server/`
 arrête son coût, et l'alerte budget signale tout oubli.

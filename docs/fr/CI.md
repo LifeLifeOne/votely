@@ -15,7 +15,8 @@ Votely est construit et testé par GitLab CI à chaque merge request et à chaqu
 ├── frontend.gitlab-ci.yml      # jobs frontend:*
 ├── e2e.gitlab-ci.yml           # jobs e2e:*
 ├── security.gitlab-ci.yml      # jobs security:*
-└── deploy.gitlab-ci.yml        # jobs deploy:* (charts Helm)
+├── deploy.gitlab-ci.yml        # jobs deploy:* (charts Helm)
+└── infra.gitlab-ci.yml         # jobs infra:* (Terraform)
 ```
 
 - Un fichier par composant : tout ce qui concerne le pipeline du backend est au même endroit,
@@ -52,10 +53,12 @@ ou un lint en échec.
 analyze   backend:lint-ruff  frontend:lint-oxlint  frontend:format-prettier  frontend:typecheck-tsc
           e2e:format-prettier  e2e:typecheck-tsc  security:sast-semgrep  security:deps-trivy
           deploy:lint-helm  deploy:validate-kubeconform
+          infra:format-terraform  infra:validate-terraform  infra:lint-tflint  infra:plan-terraform
 test      backend:test-pytest  frontend:test-vitest
 build     backend:build-image  frontend:build-image
 verify    e2e:test-playwright  security:scan-image-trivy: [backend, frontend]
-publish   backend:publish-image  frontend:publish-image     (tags de version : *:promote-image)
+publish   backend:sign-image  frontend:sign-image  →  backend:publish-image  frontend:publish-image
+          (tags de version : *:promote-image)
 ```
 
 | Stage | Rôle | Job | Outil et périmètre |
@@ -73,7 +76,8 @@ publish   backend:publish-image  frontend:publish-image     (tags de version : *
 | `build` | Les images de production | `backend:build-image`, `frontend:build-image` | Docker BuildKit, poussées dans le registry de conteneurs GitLab |
 | `verify` | Les images tout juste construites | `e2e:test-playwright` | Playwright, bureau et mobile, face à toute la stack lancée avec ces images |
 | | | `security:scan-image-trivy` | Trivy : vulnérabilités et secrets dans chaque image, et son SBOM |
-| `publish` | Les tags de déploiement | `backend:publish-image`, `frontend:publish-image` | crane : `main` et `main-<sha court>` sur les images vérifiées (branche principale) |
+| `publish` | Signées, puis taguées | `backend:sign-image`, `frontend:sign-image` | Cosign avec une clé AWS KMS : signature et attestation signée du SBOM (branche principale) |
+| | | `backend:publish-image`, `frontend:publish-image` | crane : `main` et `main-<sha court>` sur les images vérifiées et signées (branche principale) |
 | | | `backend:promote-image`, `frontend:promote-image` | crane : tag de version sur l'image vérifiée sur `main` (tags de version uniquement) |
 
 Les jobs sont nommés `<composant>:<action>-<outil>` : ce que fait le job et avec quel outil,
@@ -123,8 +127,8 @@ sera déployée.
 - **SBOM** (*Software Bill of Materials*, nomenclature logicielle) : l'analyse liste aussi chaque
   paquet de l'image, enregistré en artefact au format CycloneDX (`sbom-<composant>.cdx.json`).
   Quand une nouvelle CVE est publiée, le SBOM indique quelles images contiennent le paquet
-  concerné, sans les reconstruire ni les réanalyser. Il sera signé et attaché à l'image avec
-  Cosign.
+  concerné, sans les reconstruire ni les réanalyser. Il est ensuite signé et attaché à l'image
+  (voir [Images signées](#images-signées)).
 - **Vérifié** : une ancienne image `nginx:1.20-alpine` fait échouer le job (30 vulnérabilités
   HIGH/CRITICAL corrigeables), tout comme une image contenant un token GitHub écrit dans une
   couche (affiché masqué).
@@ -172,7 +176,7 @@ donne un numéro à une image déjà vérifiée sur `main`.
 
 ```mermaid
 flowchart LR
-    build["build<br/>:&lt;sha&gt;"] --> verify["verify<br/>e2e + scan"] --> publish["publish<br/>:main-&lt;sha court&gt;<br/>:main"]
+    build["build<br/>:&lt;sha&gt;"] --> verify["verify<br/>e2e + scan"] --> sign["sign<br/>Cosign + KMS"] --> publish["publish<br/>:main-&lt;sha court&gt;<br/>:main"]
     tag(["git tag v1.2.0"]) --> promote["promote<br/>:1.2.0"]
     publish -. même digest .-> promote
 ```
@@ -194,6 +198,36 @@ flowchart LR
   sans démon Docker, sans rien télécharger, quelques secondes par image.
 - Les pipelines de version ne lancent rien d'autre : le commit a déjà été vérifié sur `main`.
 
+### Images signées
+
+Sur `main`, chaque image est signée avant de recevoir un tag de déploiement : une image non
+signée n'est jamais promue.
+
+| Étape | Ce que fait `*:sign-image` |
+|---|---|
+| Signer | `cosign sign` sur le digest, avec la clé `awskms:///alias/votely-cosign` : la clé privée ne quitte jamais AWS KMS, le job demande seulement à KMS de signer |
+| Attester | `cosign attest --type cyclonedx` : le SBOM issu de l'analyse de l'image, signé et attaché à l'image |
+| Vérifier | `cosign verify` et `cosign verify-attestation` avec la clé publique commitée dans le dépôt ([`cosign.pub`](../../cosign.pub)), exactement comme le ferait n'importe qui |
+
+- Le job accède à KMS avec des identifiants AWS temporaires obtenus via OpenID Connect ; seuls
+  les pipelines de la branche principale peuvent utiliser le rôle de signature (voir
+  [INFRA.md](INFRA.md#accès-de-la-ci-openid-connect)).
+- Comme pour le registry privé d'une entreprise, rien n'est envoyé au journal de transparence
+  public de Sigstore (Rekor) : signatures et attestations sont rangées dans le registry du
+  projet, à côté de l'image (tags `sha256-…`, conservés par la politique de nettoyage).
+- N'importe qui peut vérifier une image :
+
+  ```bash
+  cosign verify --key cosign.pub --insecure-ignore-tlog \
+    registry.gitlab.com/stateofflowhunter/votely/backend:main
+  cosign verify-attestation --key cosign.pub --insecure-ignore-tlog --type cyclonedx \
+    registry.gitlab.com/stateofflowhunter/votely/backend:main
+  ```
+
+  `--insecure-ignore-tlog` indique seulement à Cosign de ne pas chercher la signature dans le
+  journal public, où elle n'a volontairement pas été publiée. Les images publiées avant la mise
+  en place de la signature (`0.1.0`) n'ont pas de signature.
+
 Pour publier une version, une fois le pipeline `main` du commit passé :
 
 ```bash
@@ -201,7 +235,8 @@ git tag -a v1.2.0 -m "v1.2.0"
 git push origin v1.2.0
 ```
 
-La politique de nettoyage du registry conserve les tags de version, `main` et le cache de build ;
+La politique de nettoyage du registry conserve les tags de version, `main`, le cache de build et
+les signatures (`sha256-…`) ;
 les images de commits plus anciennes sont supprimées après 14 jours : un commit doit donc être
 publié en version dans ce délai.
 
