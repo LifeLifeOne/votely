@@ -1,5 +1,6 @@
 # Full stack: docker compose up --build  ->  http://localhost:8080
 # Database only (local development): docker compose up -d db
+# VOTELY_BACKEND_IMAGE / VOTELY_FRONTEND_IMAGE run published images instead of local builds (CI).
 name: votely
 
 x-hardening: &hardening
@@ -36,7 +37,7 @@ services:
 
   # One-shot job: applies database migrations, then exits. The API waits for it.
   migrate:
-    image: votely-backend:local
+    image: ${VOTELY_BACKEND_IMAGE:-votely-backend:local}
     build: ./backend
     command: ["alembic", "upgrade", "head"]
     environment: *backend-env
@@ -47,7 +48,7 @@ services:
     <<: *hardening
 
   backend:
-    image: votely-backend:local
+    image: ${VOTELY_BACKEND_IMAGE:-votely-backend:local}
     build: ./backend
     environment: *backend-env
     depends_on:
@@ -60,7 +61,7 @@ services:
     # No published port: the API is only reachable through the frontend proxy.
 
   frontend:
-    image: votely-frontend:local
+    image: ${VOTELY_FRONTEND_IMAGE:-votely-frontend:local}
     build: ./frontend
     environment:
       VOTELY_API_UPSTREAM: http://backend:8000

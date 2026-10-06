@@ -49,6 +49,7 @@ retried once on infrastructure failures only, never on a failing test or lint.
 | `test` | `backend:test` | pytest: unit and integration tests against a PostgreSQL 16 service, migrations included; coverage ≥ 90 % |
 | | `frontend:test` | Vitest: components and pages against a fake API (MSW); coverage ≥ 80 % of lines |
 | `build` | `backend:build`, `frontend:build` | Production images built and pushed to the GitLab container registry |
+| `e2e` | `e2e:test` | Playwright, desktop and mobile, against the full stack running the images just built |
 
 Each test job only waits for the lint job of its own component (`needs`), so a slow frontend lint
 never delays the backend tests.
@@ -78,11 +79,26 @@ Images are pushed to the project's container registry:
 Builds use Docker-in-Docker with BuildKit (`docker buildx`), the standard setup on GitLab.com
 shared runners.
 
+## End-to-end tests
+
+`e2e:test` runs the same disposable stack as on a laptop (`compose.yaml` + `compose.e2e.yaml`),
+inside Docker-in-Docker, with the **exact images built by the pipeline**: the build jobs' digests
+(`BACKEND_IMAGE`, `FRONTEND_IMAGE`) are passed to Compose through `VOTELY_BACKEND_IMAGE` and
+`VOTELY_FRONTEND_IMAGE`. What is tested is byte for byte what will be deployed.
+
+- Database credentials are throwaway CI values; the JWT signing key is random for every run.
+- Playwright runs in the official image (`mcr.microsoft.com/playwright`), attached to the stack
+  network, and reaches nginx at `http://frontend:8080`.
+- The dind daemon does not share the job's filesystem, so the tests are copied in and the
+  reports copied out with `docker cp`.
+- Artifacts, kept one week even on failure: the HTML report, traces/videos/screenshots of failed
+  tests, and the logs of every container of the stack.
+
 ## Reports
 
 | Report | Where it shows up |
 |---|---|
-| JUnit (`junit.xml`) | *Tests* tab of the pipeline, and the merge request widget (new and fixed failures) |
+| JUnit (`junit.xml`, backend, frontend and e2e) | *Tests* tab of the pipeline, and the merge request widget (new and fixed failures) |
 | Coverage percentage | Merge request widget and job list, extracted from the job log |
 | Cobertura (`coverage.xml`) | Covered and uncovered lines highlighted in the merge request diff |
 

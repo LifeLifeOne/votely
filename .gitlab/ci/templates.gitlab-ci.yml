@@ -14,9 +14,8 @@
         - .gitlab/ci/**/*
     - if: $CI_PIPELINE_SOURCE != "merge_request_event"
 
-# Build a component image (COMPONENT=backend|frontend) with BuildKit and push it to the
-# project's container registry, tagged with the full commit SHA (immutable, traceable).
-.docker-build:
+# Docker-in-Docker client, logged in to the project's container registry with the job token.
+.docker:
   image: docker:29
   services:
     - docker:29-dind
@@ -25,9 +24,17 @@
     DOCKER_TLS_CERTDIR: /certs
     DOCKER_TLS_VERIFY: "1"
     DOCKER_CERT_PATH: /certs/client
-    IMAGE: $CI_REGISTRY_IMAGE/$COMPONENT
   before_script:
     - echo "$CI_REGISTRY_PASSWORD" | docker login --username "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+
+# Build a component image (COMPONENT=backend|frontend) with BuildKit and push it to the
+# project's container registry, tagged with the full commit SHA (immutable, traceable).
+.docker-build:
+  extends: .docker
+  variables:
+    IMAGE: $CI_REGISTRY_IMAGE/$COMPONENT
+  before_script:
+    - !reference [.docker, before_script]
     # The docker-container driver can export the layer cache to the registry. With the TLS
     # connection to the dind service, buildx needs a named context to create its builder.
     - docker context create ci

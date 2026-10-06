@@ -52,6 +52,7 @@ ou un lint en échec.
 | `test` | `backend:test` | pytest : tests unitaires et d'intégration face à un service PostgreSQL 16, migrations comprises ; couverture ≥ 90 % |
 | | `frontend:test` | Vitest : composants et pages face à une fausse API (MSW) ; couverture ≥ 80 % des lignes |
 | `build` | `backend:build`, `frontend:build` | Images de production construites et poussées dans le registry de conteneurs GitLab |
+| `e2e` | `e2e:test` | Playwright, bureau et mobile, face à toute la stack lancée avec les images tout juste construites |
 
 Chaque job de test n'attend que le lint de son propre composant (`needs`) : un lint frontend lent
 ne retarde jamais les tests du backend.
@@ -81,11 +82,28 @@ Les images sont poussées dans le registry de conteneurs du projet :
 Les builds utilisent Docker-in-Docker avec BuildKit (`docker buildx`), la configuration standard
 sur les runners partagés de GitLab.com.
 
+## Tests end-to-end
+
+`e2e:test` lance la même stack jetable que sur un poste de développement (`compose.yaml` +
+`compose.e2e.yaml`), dans Docker-in-Docker, avec **les images exactes construites par le
+pipeline** : les digests des jobs de build (`BACKEND_IMAGE`, `FRONTEND_IMAGE`) sont passés à
+Compose via `VOTELY_BACKEND_IMAGE` et `VOTELY_FRONTEND_IMAGE`. Ce qui est testé est, octet pour
+octet, ce qui sera déployé.
+
+- Les identifiants de base sont des valeurs jetables de CI ; la clé de signature JWT est
+  aléatoire à chaque exécution.
+- Playwright tourne dans l'image officielle (`mcr.microsoft.com/playwright`), branchée sur le
+  réseau de la stack, et joint nginx sur `http://frontend:8080`.
+- Le démon dind ne partage pas le système de fichiers du job : les tests y sont copiés et les
+  rapports récupérés avec `docker cp`.
+- Artefacts, conservés une semaine même en cas d'échec : le rapport HTML, les traces / vidéos /
+  captures des tests échoués, et les logs de chaque conteneur de la stack.
+
 ## Rapports
 
 | Rapport | Où il apparaît |
 |---|---|
-| JUnit (`junit.xml`) | Onglet *Tests* du pipeline, et widget de la merge request (nouveaux échecs, tests corrigés) |
+| JUnit (`junit.xml`, backend, frontend et e2e) | Onglet *Tests* du pipeline, et widget de la merge request (nouveaux échecs, tests corrigés) |
 | Pourcentage de couverture | Widget de la merge request et liste des jobs, extrait du log du job |
 | Cobertura (`coverage.xml`) | Lignes couvertes et non couvertes surlignées dans le diff de la merge request |
 

@@ -118,3 +118,4 @@ Both images currently report no fixable HIGH/CRITICAL vulnerability and no secre
 | `VOTELY_LOG_LEVEL` | backend | `INFO` |
 | `VOTELY_HTTP_PORT` | frontend published port | `8080` |
 | `VOTELY_API_UPSTREAM` | frontend nginx | `http://backend:8000` |
+| `VOTELY_BACKEND_IMAGE`, `VOTELY_FRONTEND_IMAGE` | Compose | `votely-backend:local`, `votely-frontend:local` (CI runs the registry images instead) |

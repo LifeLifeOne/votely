@@ -44,6 +44,9 @@ npm run stack:down               # remove containers and data
 
 `E2E_BASE_URL` points the tests to another environment (e.g. staging).
 
+In CI, the `e2e:test` job runs the same suite against the images built by the pipeline (see
+[CI.md](CI.md#end-to-end-tests)).
+
 ### Watch them
 
 | Command | What you get |
