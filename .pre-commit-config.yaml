@@ -8,6 +8,8 @@ repos:
       - id: check-yaml
         # --unsafe: syntax check only, so Compose tags (!reset, !override) are accepted.
         args: [--allow-multiple-documents, --unsafe]
+        # Helm templates are Go templates, validated by helm lint and kubeconform in CI.
+        exclude: ^deploy/helm/[^/]+/templates/
       - id: check-added-large-files
       - id: detect-private-key
 
