@@ -67,8 +67,8 @@ backend:build-image:
     - job: backend:test-pytest
       optional: true
 
-backend:publish-image:
-  extends: .publish-image
+backend:sign-image:
+  extends: .sign-image
   variables:
     COMPONENT: backend
   # Only once the image passed every check of the verify stage.
@@ -76,10 +76,19 @@ backend:publish-image:
     - backend:build-image # BACKEND_IMAGE digest
     - job: e2e:test-playwright
       artifacts: false
-    - job: security:scan-image-trivy
+    - job: security:scan-image-trivy # sbom-backend.cdx.json
       parallel:
         matrix:
           - COMPONENT: backend
+
+backend:publish-image:
+  extends: .publish-image
+  variables:
+    COMPONENT: backend
+  # Deployment tags only on a signed image.
+  needs:
+    - backend:build-image # BACKEND_IMAGE digest
+    - job: backend:sign-image
       artifacts: false
 
 backend:promote-image:
