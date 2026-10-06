@@ -15,3 +15,15 @@ variable "budget_email" {
   type        = string
   sensitive   = true
 }
+
+variable "gitlab_project_path" {
+  description = "GitLab project allowed to assume the CI roles."
+  type        = string
+  default     = "StateOfFlowHunter/votely"
+}
+
+variable "gitlab_main" {
+  description = "Only pipelines of this branch may sign images."
+  type        = string
+  default     = "main"
+}

@@ -12,3 +12,8 @@ output "cosign_key_alias" {
   description = "KMS alias used by Cosign (awskms:///alias/...)."
   value       = aws_kms_alias.cosign.name
 }
+
+output "ci_role_names" {
+  description = "IAM roles assumed by GitLab CI (ARN: arn:aws:iam::<account>:role/<name>)."
+  value       = { plan = aws_iam_role.ci_plan.name, signer = aws_iam_role.ci_signer.name }
+}
