@@ -111,7 +111,8 @@ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy \
 ```
 
 Les deux images ne présentent actuellement aucune vulnérabilité HIGH/CRITICAL corrigeable et
-aucun secret.
+aucun secret. En CI, `security:scan-image-trivy` fait ces deux vérifications sur chaque image
+construite (voir [CI.md](CI.md#analyse-des-images-et-sbom)).
 
 ## Configuration
 

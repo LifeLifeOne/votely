@@ -51,7 +51,7 @@ analyze   backend:lint-ruff  frontend:lint-oxlint  frontend:format-prettier  fro
           e2e:format-prettier  e2e:typecheck-tsc  security:sast-semgrep  security:deps-trivy
 test      backend:test-pytest  frontend:test-vitest
 build     backend:build-image  frontend:build-image
-verify    e2e:test-playwright
+verify    e2e:test-playwright  security:scan-image-trivy: [backend, frontend]
 ```
 
 | Stage | Rôle | Job | Outil et périmètre |
@@ -67,6 +67,7 @@ verify    e2e:test-playwright
 | | | `frontend:test-vitest` | Vitest : composants et pages face à une fausse API (MSW) ; couverture ≥ 80 % des lignes |
 | `build` | Les images de production | `backend:build-image`, `frontend:build-image` | Docker BuildKit, poussées dans le registry de conteneurs GitLab |
 | `verify` | Les images tout juste construites | `e2e:test-playwright` | Playwright, bureau et mobile, face à toute la stack lancée avec ces images |
+| | | `security:scan-image-trivy` | Trivy : vulnérabilités et secrets dans chaque image, et son SBOM |
 
 Les jobs sont nommés `<composant>:<action>-<outil>` : ce que fait le job et avec quel outil,
 regroupés par composant dans le graphe.
@@ -88,6 +89,7 @@ fois construites) vient dans le stage `verify`.
 | `security:sast-semgrep` | Motifs de code vulnérables dans notre code (injection, en-têtes dangereux, crypto faible…) | une alerte est trouvée |
 | `backend:lint-ruff` (règles `S`) | Appels risqués propres à Python (`eval`, `subprocess` avec un shell, mots de passe en dur…) | une alerte en dehors de `tests/` |
 | `security:deps-trivy` | CVE connues dans les dépendances de production | une vulnérabilité HIGH ou CRITICAL **pour laquelle un correctif existe** |
+| `security:scan-image-trivy` | CVE connues dans tout ce que contiennent les images (paquets du système de base compris), secrets restés dans une couche | une vulnérabilité HIGH ou CRITICAL corrigeable, ou un secret |
 
 - Seules les vulnérabilités de dépendances corrigeables font échouer le pipeline : ce sont celles
   sur lesquelles on peut agir (mise à jour) ; les autres sont listées dans l'artefact
@@ -99,6 +101,26 @@ fois construites) vient dans le stage `verify`.
   en artefacts.
 - La première exécution de Semgrep a montré que nginx transmettait à l'API l'en-tête `Host` du
   client (une valeur contrôlée par l'attaquant) ; il n'est plus transmis.
+
+### Analyse des images et SBOM
+
+`security:scan-image-trivy` tourne une fois par image (`parallel: matrix`), en même temps que les
+tests end-to-end, sur le digest exporté par le job de build : l'image analysée est celle qui
+sera déployée.
+
+- **Pourquoi analyser aussi les images** : les fichiers de verrouillage ne listent que nos
+  dépendances. L'image de base apporte ses propres paquets (Debian ou Alpine, OpenSSL, zlib…), et
+  un fichier copié par erreur peut contenir un secret. Les deux n'existent que dans l'image.
+- **Sans démon Docker** : Trivy lit les couches directement dans le registry, authentifié avec le
+  jeton du job.
+- **SBOM** (*Software Bill of Materials*, nomenclature logicielle) : l'analyse liste aussi chaque
+  paquet de l'image, enregistré en artefact au format CycloneDX (`sbom-<composant>.cdx.json`).
+  Quand une nouvelle CVE est publiée, le SBOM indique quelles images contiennent le paquet
+  concerné, sans les reconstruire ni les réanalyser. Il sera signé et attaché à l'image avec
+  Cosign.
+- **Vérifié** : une ancienne image `nginx:1.20-alpine` fait échouer le job (30 vulnérabilités
+  HIGH/CRITICAL corrigeables), tout comme une image contenant un token GitHub écrit dans une
+  couche (affiché masqué).
 
 ### Défense en profondeur pour les secrets
 
@@ -156,7 +178,7 @@ octet, ce qui sera déployé.
 
 | Rapport | Où il apparaît |
 |---|---|
-| JUnit (`junit.xml`, backend, frontend et e2e) | Onglet *Tests* du pipeline, et widget de la merge request (nouveaux échecs, tests corrigés) |
+| JUnit (backend, frontend, e2e et jobs de sécurité) | Onglet *Tests* du pipeline, et widget de la merge request (nouveaux échecs, tests corrigés) |
 | Pourcentage de couverture | Widget de la merge request et liste des jobs, extrait du log du job |
 | Cobertura (`coverage.xml`) | Lignes couvertes et non couvertes surlignées dans le diff de la merge request |
 

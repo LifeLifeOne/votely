@@ -106,7 +106,9 @@ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy \
   image --scanners secret votely-frontend:local
 ```
 
-Both images currently report no fixable HIGH/CRITICAL vulnerability and no secret.
+Both images currently report no fixable HIGH/CRITICAL vulnerability and no secret. In CI,
+`security:scan-image-trivy` runs both checks on every image built (see
+[CI.md](CI.md#image-scan-and-sbom)).
 
 ## Configuration
 

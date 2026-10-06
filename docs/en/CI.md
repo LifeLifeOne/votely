@@ -48,7 +48,7 @@ analyze   backend:lint-ruff  frontend:lint-oxlint  frontend:format-prettier  fro
           e2e:format-prettier  e2e:typecheck-tsc  security:sast-semgrep  security:deps-trivy
 test      backend:test-pytest  frontend:test-vitest
 build     backend:build-image  frontend:build-image
-verify    e2e:test-playwright
+verify    e2e:test-playwright  security:scan-image-trivy: [backend, frontend]
 ```
 
 | Stage | Purpose | Job | Tool and scope |
@@ -64,6 +64,7 @@ verify    e2e:test-playwright
 | | | `frontend:test-vitest` | Vitest: components and pages against a fake API (MSW); coverage ≥ 80 % of lines |
 | `build` | Production images | `backend:build-image`, `frontend:build-image` | Docker BuildKit, pushed to the GitLab container registry |
 | `verify` | The images just built | `e2e:test-playwright` | Playwright, desktop and mobile, against the full stack running those images |
+| | | `security:scan-image-trivy` | Trivy: vulnerabilities and secrets in each image, and its SBOM |
 
 Job names follow `<component>:<action>-<tool>`: what the job does and with which tool, grouped
 by component in the graph.
@@ -85,6 +86,7 @@ the `verify` stage.
 | `security:sast-semgrep` | Vulnerable code patterns in our code (injection, unsafe headers, weak crypto…) | any finding |
 | `backend:lint-ruff` (`S` rules) | Python-specific risky calls (`eval`, `subprocess` with a shell, hardcoded passwords…) | any finding outside `tests/` |
 | `security:deps-trivy` | Known CVEs in the production dependencies | a HIGH or CRITICAL vulnerability **with a fix available** |
+| `security:scan-image-trivy` | Known CVEs in everything the images contain (base OS packages included), secrets left in a layer | a fixable HIGH or CRITICAL vulnerability, or a secret |
 
 - Only fixable dependency vulnerabilities fail the pipeline: they are the ones we can act on
   (upgrade); the others are listed in the `trivy-deps.json` artifact. Development dependencies
@@ -94,6 +96,24 @@ the `verify` stage.
   Ultimate tier; full reports (SARIF, JSON) are kept as artifacts.
 - The first Semgrep run found that nginx forwarded the client's `Host` header to the API (an
   attacker-controlled value); it is no longer forwarded.
+
+### Image scan and SBOM
+
+`security:scan-image-trivy` runs once per image (`parallel: matrix`), alongside the end-to-end
+tests, on the digest exported by the build job: the scanned image is the one that will be
+deployed.
+
+- **Why scan the images too**: the lockfiles only list our dependencies. The base image brings
+  its own packages (Debian or Alpine, OpenSSL, zlib…), and a file copied by mistake can carry a
+  secret. Both only exist in the image.
+- **No Docker daemon**: Trivy reads the layers straight from the registry, authenticated with the
+  job token.
+- **SBOM** (*Software Bill of Materials*): the scan also lists every package of the image, saved
+  as a CycloneDX artifact (`sbom-<component>.cdx.json`). When a new CVE is published, the SBOM
+  tells which images contain the affected package without rebuilding or rescanning them. It will
+  be signed and attached to the image with Cosign.
+- **Verified**: an old `nginx:1.20-alpine` image fails the job (30 fixable HIGH/CRITICAL
+  vulnerabilities), and so does an image with a GitHub token written in a layer (reported masked).
 
 ### Defence in depth for secrets
 
@@ -148,7 +168,7 @@ inside Docker-in-Docker, with the **exact images built by the pipeline**: the bu
 
 | Report | Where it shows up |
 |---|---|
-| JUnit (`junit.xml`, backend, frontend and e2e) | *Tests* tab of the pipeline, and the merge request widget (new and fixed failures) |
+| JUnit (backend, frontend, e2e and security jobs) | *Tests* tab of the pipeline, and the merge request widget (new and fixed failures) |
 | Coverage percentage | Merge request widget and job list, extracted from the job log |
 | Cobertura (`coverage.xml`) | Covered and uncovered lines highlighted in the merge request diff |
 
