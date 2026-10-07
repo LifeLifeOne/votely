@@ -19,16 +19,22 @@ deploy:lint-helm:
     # Chart structure and best practices; --strict fails on warnings too.
     - helm lint --strict deploy/helm/postgres
     - helm lint --strict deploy/helm/votely --values deploy/helm/votely/values-kind.yaml
-    - helm lint --strict deploy/helm/votely --values deploy/helm/votely/values-aws.yaml
+    - helm lint --strict deploy/helm/votely --values deploy/environments/staging/values.yaml
+    - helm lint --strict deploy/helm/votely --values deploy/environments/prod/values.yaml
     # Render every chart with its values files for the schema validation job.
     - mkdir rendered
     - helm template postgres deploy/helm/postgres > rendered/postgres.yaml
     - helm template votely deploy/helm/votely > rendered/votely.yaml
     - helm template votely deploy/helm/votely --values deploy/helm/votely/values-kind.yaml > rendered/votely-kind.yaml
-    - helm template votely deploy/helm/votely --values deploy/helm/votely/values-aws.yaml > rendered/votely-aws.yaml
-    # Plain manifests: the cert-manager issuers and the Argo CD applications.
-    - mkdir rendered/platform rendered/argocd
+    - |
+      for env in staging prod; do
+        helm template votely deploy/helm/votely --namespace "votely-$env" \
+          --values "deploy/environments/$env/values.yaml" > "rendered/votely-$env.yaml"
+      done
+    # Plain manifests: the cert-manager issuers, the sealed secrets and the Argo CD applications.
+    - mkdir rendered/platform rendered/argocd rendered/sealed
     - cp deploy/platform/cert-manager/*.yaml rendered/platform/
+    - for env in staging prod; do cp "deploy/environments/$env/sealed-secrets.yaml" "rendered/sealed/$env.yaml"; done
     - cp deploy/argocd/root.yaml deploy/argocd/apps/*.yaml rendered/argocd/
   artifacts:
     expire_in: 1 week

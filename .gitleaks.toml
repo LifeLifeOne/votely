@@ -1,0 +1,12 @@
+# Gitleaks configuration, used by the pre-commit hook and the CI job (security:secrets-gitleaks).
+[extend]
+useDefault = true
+
+# Sealed Secrets: the values in deploy/environments/*/sealed-secrets.yaml are encrypted for the
+# cluster's Sealed Secrets controller and safe to publish, but their entropy looks like an API
+# key. Only values with the exact shape of a sealed ciphertext (a long base64 string starting
+# with "Ag") are ignored: any other secret, in these files or elsewhere, is still reported.
+[[allowlists]]
+description = "Sealed Secrets ciphertext"
+regexTarget = "secret"
+regexes = ['''^Ag[A-Za-z0-9+/]{200,}={0,2}$''']

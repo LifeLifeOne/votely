@@ -61,9 +61,11 @@ helm -n votely rollback votely 1               # revenir à la révision 1
 
 ## Sur le serveur AWS
 
-Les mêmes charts tournent sur le serveur k3s ([INFRA.md](INFRA.md)), à l'adresse
-**https://votely.52.16.15.223.sslip.io** : [sslip.io](https://sslip.io) fait pointer tout nom
-qui se termine par une adresse IP vers cette adresse, sans avoir à acheter de domaine.
+Les mêmes charts tournent sur le serveur k3s ([INFRA.md](INFRA.md)), déployés par Argo CD dans
+deux environnements : la **production** sur https://votely.52.16.15.223.sslip.io et le
+**staging** sur https://staging.votely.52.16.15.223.sslip.io. [sslip.io](https://sslip.io) fait
+pointer tout nom qui se termine par une adresse IP vers cette adresse, sans avoir à acheter de
+domaine.
 
 L'API Kubernetes n'est jamais exposée sur Internet : `kubectl` passe par un tunnel Systems
 Manager, avec la même connexion SSO que la console AWS.
@@ -79,19 +81,18 @@ deploy/aws/tunnel.sh                # à laisser tourner dans un terminal
 
 export KUBECONFIG=~/.kube/votely-aws.yaml
 kubectl get nodes                   # votely   Ready
-deploy/aws/install.sh               # cert-manager, Secrets, PostgreSQL, Votely (idempotent)
+deploy/aws/install-argocd.sh        # une fois : Argo CD, qui déploie ensuite tout ce que décrit Git
 ```
 
 | Élément | Rôle |
 |---|---|
 | **cert-manager** | Obtient le certificat auprès de Let's Encrypt et le renouvelle 30 jours avant son expiration |
 | `letsencrypt-staging`, `letsencrypt-prod` ([`cluster-issuers.yaml`](../../deploy/platform/cert-manager/cluster-issuers.yaml)) | Staging pour tester sans limite (certificat non reconnu), production pour le vrai. Le défi HTTP-01 est validé sur le port 80 via Traefik |
-| `values-aws.yaml` | Nom d'hôte public, `ingress.clusterIssuer: letsencrypt-prod`, cookie de session sécurisé |
+| `deploy/environments/<env>/values.yaml` | Nom d'hôte, `ingress.clusterIssuer: letsencrypt-prod`, version des images et nombre de copies de chaque environnement |
 | Ingress | Demande le certificat à cert-manager (`cert-manager.io/cluster-issuer`), sert le HTTPS et redirige le HTTP avec un `Middleware` Traefik (`308`) |
 
-`install.sh` est provisoire : Argo CD reprendra le déploiement en GitOps (étape 10). Seuls les
-tests de plateforme (santé, en-têtes de sécurité, routes) tournent contre cet environnement, car
-ils ne créent aucune donnée : [TESTS.md](TESTS.md).
+Seuls les tests de plateforme (santé, en-têtes de sécurité, routes) tournent contre ces
+environnements, car ils ne créent aucune donnée : [TESTS.md](TESTS.md).
 
 ## Deux charts
 
@@ -132,8 +133,8 @@ version en place continue de servir.
 | `database.existingSecret` | `votely-db` | Secret avec `username`, `password`, `database` |
 | `jwt.existingSecret` | `votely-jwt` | Secret avec `jwt-secret` |
 
-`values-kind.yaml` contient les réglages du cluster local, `values-aws.yaml` ceux du serveur
-AWS.
+`values-kind.yaml` contient les réglages du cluster local ; chaque environnement AWS a son propre
+fichier dans `deploy/environments/`.
 
 - **Aucun secret dans les charts ni dans Git.** Les charts ne font que référencer des Secrets
   par leur nom. En local, `up.sh` génère des identifiants aléatoires directement dans le

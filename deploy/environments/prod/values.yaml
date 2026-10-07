@@ -1,0 +1,13 @@
+# Production: released versions only (git tag vX.Y.Z), the same images that went through staging.
+host: votely.52.16.15.223.sslip.io
+ingress:
+  clusterIssuer: letsencrypt-prod
+
+image:
+  tag: "0.2.0"
+  pullPolicy: IfNotPresent
+
+backend:
+  replicas: 2
+frontend:
+  replicas: 2
