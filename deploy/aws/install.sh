@@ -17,7 +17,7 @@ CERT_MANAGER_VERSION=v1.21.2
 helm upgrade --install cert-manager cert-manager --repo https://charts.jetstack.io \
   --version "$CERT_MANAGER_VERSION" --namespace cert-manager --create-namespace \
   --set crds.enabled=true --wait
-kubectl apply --filename deploy/aws/cluster-issuers.yaml
+kubectl apply --filename deploy/platform/cert-manager/cluster-issuers.yaml
 
 kubectl create namespace "$NAMESPACE" --dry-run=client --output yaml | kubectl apply --filename -
 

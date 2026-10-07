@@ -85,7 +85,7 @@ deploy/aws/install.sh               # cert-manager, Secrets, PostgreSQL, Votely 
 | Piece | Role |
 |---|---|
 | **cert-manager** | Obtains the certificate from Let's Encrypt and renews it 30 days before it expires |
-| `letsencrypt-staging`, `letsencrypt-prod` ([`cluster-issuers.yaml`](../../deploy/aws/cluster-issuers.yaml)) | Staging to test without rate limits (untrusted certificate), production for the real one. The HTTP-01 challenge is answered on port 80 through Traefik |
+| `letsencrypt-staging`, `letsencrypt-prod` ([`cluster-issuers.yaml`](../../deploy/platform/cert-manager/cluster-issuers.yaml)) | Staging to test without rate limits (untrusted certificate), production for the real one. The HTTP-01 challenge is answered on port 80 through Traefik |
 | `values-aws.yaml` | Public hostname, `ingress.clusterIssuer: letsencrypt-prod`, secure session cookie |
 | Ingress | Asks cert-manager for the certificate (`cert-manager.io/cluster-issuer`), serves HTTPS, and redirects HTTP with a Traefik `Middleware` (`308`) |
 

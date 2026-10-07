@@ -12,4 +12,8 @@ helm upgrade --install argocd argo-cd --repo https://argoproj.github.io/argo-hel
   --version "$ARGOCD_CHART_VERSION" --namespace argocd --create-namespace \
   --values deploy/platform/argocd/values.yaml --wait
 
+# The root application: from now on, Argo CD deploys what deploy/argocd/apps/ describes on the
+# default branch.
+kubectl apply --filename deploy/argocd/root.yaml
+
 echo "Argo CD is running. Open the UI with: deploy/aws/argocd-ui.sh"

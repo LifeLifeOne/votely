@@ -1,0 +1,21 @@
+# Root application ("app of apps"): everything that runs in the cluster is described by the
+# Application manifests in deploy/argocd/apps/ on the default branch. Applied once by hand
+# (deploy/aws/install-argocd.sh); afterwards a merge request is the only way to change the cluster.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://gitlab.com/StateOfFlowHunter/votely.git
+    targetRevision: main
+    path: deploy/argocd/apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true # an Application removed from Git is removed from the cluster
+      selfHeal: true # a manual change in the cluster is reverted to what Git says
