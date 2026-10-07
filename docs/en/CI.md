@@ -16,7 +16,8 @@ Pipelines: https://gitlab.com/StateOfFlowHunter/votely/-/pipelines
 ├── e2e.gitlab-ci.yml           # e2e:* jobs
 ├── security.gitlab-ci.yml      # security:* jobs
 ├── deploy.gitlab-ci.yml        # deploy:* jobs (Helm charts)
-└── infra.gitlab-ci.yml         # infra:* jobs (Terraform)
+├── infra.gitlab-ci.yml         # infra:* jobs (Terraform)
+└── environments.gitlab-ci.yml  # staging:* and prod:* jobs (GitOps deployment)
 ```
 
 - One file per component: everything that concerns the backend pipeline is in one place, while
@@ -56,6 +57,7 @@ build     backend:build-image  frontend:build-image
 verify    e2e:test-playwright  security:scan-image-trivy: [backend, frontend]
 publish   backend:sign-image  frontend:sign-image  →  backend:publish-image  frontend:publish-image
           (release tags: *:promote-image)
+deploy    staging:update-git                       (release tags: prod:verify-cosign → prod:update-git)
 ```
 
 | Stage | Purpose | Job | Tool and scope |
@@ -67,7 +69,9 @@ publish   backend:sign-image  frontend:sign-image  →  backend:publish-image  f
 | | | `frontend:typecheck-tsc`, `e2e:typecheck-tsc` | TypeScript compiler, strict mode |
 | | | `security:sast-semgrep` | Semgrep: Python, TypeScript, React, OWASP Top 10 and Dockerfile rulesets |
 | | | `security:deps-trivy` | Trivy: known vulnerabilities in the production dependencies (`uv.lock`, `package-lock.json`) |
-| | | `deploy:lint-helm`, `deploy:validate-kubeconform` | Helm lint (strict), then every rendered manifest validated against the Kubernetes API schemas |
+| | | `deploy:lint-helm`, `deploy:validate-kubeconform` | Helm lint (strict), then every rendered manifest validated against the Kubernetes API schemas and the CRD catalog |
+| | | `infra:format-terraform`, `infra:validate-terraform`, `infra:lint-tflint` | Terraform format, validation and tflint (AWS rules) of every stack |
+| | | `infra:plan-terraform` | Read-only `terraform plan` through OpenID Connect, so reviewers see what would change on AWS |
 | `test` | Running the code | `backend:test-pytest` | pytest: unit and integration tests against a PostgreSQL 16 service, migrations included; coverage ≥ 90 % |
 | | | `frontend:test-vitest` | Vitest: components and pages against a fake API (MSW); coverage ≥ 80 % of lines |
 | `build` | Production images | `backend:build-image`, `frontend:build-image` | Docker BuildKit, pushed to the GitLab container registry |
@@ -76,6 +80,8 @@ publish   backend:sign-image  frontend:sign-image  →  backend:publish-image  f
 | `publish` | Signed, then tagged | `backend:sign-image`, `frontend:sign-image` | Cosign with an AWS KMS key: signature and signed SBOM attestation (default branch) |
 | | | `backend:publish-image`, `frontend:publish-image` | crane: `main` and `main-<short sha>` on the verified and signed images (default branch) |
 | | | `backend:promote-image`, `frontend:promote-image` | crane: version tag on the image verified on `main` (release tags only) |
+| `deploy` | Environment versions written to Git | `staging:update-git` | Commits `main-<short sha>` to the staging values (default branch); Argo CD deploys it |
+| | | `prod:verify-cosign`, `prod:update-git` | Verifies the release images' signatures, then commits the version to the production values (release tags only) |
 
 Job names follow `<component>:<action>-<tool>`: what the job does and with which tool, grouped
 by component in the graph.
@@ -219,12 +225,16 @@ promoted.
   where it was deliberately not published. Images released before signing was introduced
   (`0.1.0`) have no signature.
 
-To release, once the `main` pipeline of the commit has passed:
+To release, tag the merge commit that runs in staging, once its `main` pipeline has passed
+(not a `chore(deploy)` commit of the CI: those run no pipeline, so they have no images):
 
 ```bash
-git tag -a v1.2.0 -m "v1.2.0"
+git tag -a v1.2.0 <merge commit> -m "v1.2.0"
 git push origin v1.2.0
 ```
+
+The release pipeline promotes the images, verifies their signatures and commits the version to
+the production values; Argo CD deploys it ([GITOPS.md](GITOPS.md)).
 
 The registry cleanup policy keeps version tags, `main`, the build cache and the signatures
 (`sha256-…`); older commit images are removed after 14 days, so a commit should be released
