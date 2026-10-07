@@ -3,6 +3,8 @@
 .env.*
 !.env.example
 *.pem
+# Public certificate of the Sealed Secrets controller (encrypts only, safe to publish).
+!deploy/platform/sealed-secrets/sealing-cert.pem
 *.key
 
 # Python
