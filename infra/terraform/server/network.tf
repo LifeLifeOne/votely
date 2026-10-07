@@ -1,11 +1,7 @@
 # Minimal network: one VPC, one public subnet, an internet gateway. No NAT gateway (it would cost
 # more than the server): the only instance has a public address of its own.
-data "aws_availability_zones" "available" {
-  state = "available"
-}
-
 resource "aws_vpc" "main" {
-  cidr_block           = "10.42.0.0/16"
+  cidr_block           = "10.0.0.0/16" # distinct from the k3s pod (10.42/16) and service (10.43/16) ranges
   enable_dns_support   = true
   enable_dns_hostnames = true
 
@@ -24,8 +20,8 @@ resource "aws_internet_gateway" "main" {
 
 resource "aws_subnet" "public" {
   vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.42.1.0/24"
-  availability_zone = data.aws_availability_zones.available.names[0]
+  cidr_block        = "10.0.1.0/24"
+  availability_zone = data.aws_ebs_volume.data.availability_zone # where the persistent disk is
 
   tags = {
     Name = "votely-public"

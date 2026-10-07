@@ -42,7 +42,12 @@ npm test                         # headless, desktop + mobile
 npm run stack:down               # remove containers and data
 ```
 
-`E2E_BASE_URL` points the tests to another environment (e.g. staging).
+`E2E_BASE_URL` points the tests to another environment. On an environment whose data must be
+kept, run only the platform tests, which create nothing:
+
+```bash
+E2E_BASE_URL=https://votely.52.16.15.223.sslip.io npx playwright test tests/platform.spec.ts
+```
 
 In CI, the `e2e:test-playwright` job runs the same suite against the images built by the pipeline (see
 [CI.md](CI.md#end-to-end-tests)).

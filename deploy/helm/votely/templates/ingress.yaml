@@ -1,12 +1,24 @@
 # Single entry point: every request goes to the frontend, which serves the app and proxies /api.
+# With a ClusterIssuer, cert-manager obtains and renews the certificate, and HTTP is redirected.
+{{- $tls := .Values.ingress.clusterIssuer }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ .Release.Name }}
   labels:
     {{- include "votely.labels" (dict "root" $ "component" "frontend") | nindent 4 }}
+  {{- with $tls }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ . }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ $.Release.Namespace }}-{{ $.Release.Name }}-https-redirect@kubernetescrd
+  {{- end }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
+  {{- if $tls }}
+  tls:
+    - hosts: [{{ .Values.host | quote }}]
+      secretName: {{ .Release.Name }}-tls
+  {{- end }}
   rules:
     - host: {{ .Values.host }}
       http:

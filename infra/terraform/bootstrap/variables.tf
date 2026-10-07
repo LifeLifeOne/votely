@@ -27,3 +27,9 @@ variable "gitlab_main" {
   type        = string
   default     = "main"
 }
+
+variable "data_volume_size_gb" {
+  description = "Size of the persistent cluster data disk (k3s state, images, database volumes)."
+  type        = number
+  default     = 20
+}

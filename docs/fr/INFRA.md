@@ -9,21 +9,22 @@ regarder.
 ```
 infra/terraform/
 ├── .tflint.hcl     # règles de lint communes à toutes les stacks (Terraform + AWS)
-├── bootstrap/      # conservé : bucket du state, alerte budget, IP publique, accès CI, clé de signature
-└── server/         # créé et détruit à volonté : réseau, pare-feu, serveur
+├── bootstrap/      # conservé : bucket du state, alerte budget, IP publique, disque de données, accès CI, clé de signature
+└── server/         # créé et détruit à volonté : réseau, pare-feu, serveur avec k3s
 ```
 
 ```mermaid
 flowchart LR
     internet([Internet]) -->|"80, 443"| sg
     you([Toi, connecté en SSO]) -.->|"session Systems Manager"| ssm[AWS Systems Manager]
-    subgraph vpc [VPC 10.42.0.0/16 · eu-west-1]
-        subgraph subnet [sous-réseau public 10.42.1.0/24]
+    subgraph vpc [VPC 10.0.0.0/16 · eu-west-1a]
+        subgraph subnet [sous-réseau public 10.0.1.0/24]
             sg{{security group}} --> server["EC2 t3a.large<br/>Amazon Linux 2023"]
         end
     end
     server -.->|"sortant uniquement"| ssm
     eip[(Elastic IP<br/>stack bootstrap)] --- server
+    disk[(disque de données 20 Gio<br/>stack bootstrap)] --- server
 ```
 
 Chaque dossier est une **stack** séparée, avec son propre state et son propre cycle de vie : le
@@ -112,17 +113,17 @@ autre chose.
 ## Serveur
 
 La stack `server` regroupe tout ce qui ne coûte que lorsqu'il tourne. Elle est créée au début
-d'une session de travail et détruite à la fin ; l'adresse IP permanente reste dans la stack
-bootstrap : l'adresse publique (et plus tard le nom d'hôte et son certificat HTTPS) ne change
-jamais.
+d'une session de travail et détruite à la fin. Ce qui doit survivre vit dans la stack
+bootstrap : l'adresse IP permanente (le nom d'hôte ne change jamais) et le **disque de données**
+(le cluster revient tel quel, voir plus bas).
 
 | Ressource | Réglages |
 |---|---|
-| VPC et sous-réseau public | `10.42.0.0/16`, un sous-réseau, une internet gateway. **Pas de NAT gateway** : elle coûterait plus cher que le serveur, qui a sa propre adresse publique |
+| VPC et sous-réseau public | `10.0.0.0/16` (distinct des plages des pods et services de k3s, `10.42/16` et `10.43/16`), un sous-réseau dans la zone du disque de données, une internet gateway. **Pas de NAT gateway** : elle coûterait plus cher que le serveur, qui a sa propre adresse publique |
 | Security group par défaut | Vidé : rien ne peut l'utiliser par accident |
 | Security group | Entrée **80 et 443 uniquement** ; sortie libre (images, paquets, Let's Encrypt, Systems Manager) |
 | Rôle IAM | `AmazonSSMManagedInstanceCore` uniquement : le serveur peut s'enregistrer auprès de Systems Manager, rien d'autre |
-| Instance EC2 | `t3a.large` (2 vCPU, 8 Gio), dernière Amazon Linux 2023, disque gp3 chiffré de 30 Gio |
+| Instance EC2 | `t3a.large` (2 vCPU, 8 Gio), dernière Amazon Linux 2023, disque système gp3 chiffré de 20 Gio, adresse privée fixe `10.0.1.10` |
 | Métadonnées de l'instance | IMDSv2 obligatoire, un seul saut réseau : les conteneurs ne peuvent pas lire les identifiants de l'instance |
 | Elastic IP | Créée par la stack bootstrap (`prevent_destroy`), associée par la stack server, retrouvée par son tag `Name` |
 
@@ -148,6 +149,31 @@ du `.deb` officiel (`session-manager-plugin.deb`) dans `~/.local/bin`.
 
 Une image Amazon Linux plus récente est prise à chaque recréation du serveur ; un serveur en
 marche n'est jamais remplacé parce qu'une nouvelle image est sortie (`ignore_changes = [ami]`).
+
+### k3s et le disque de données permanent
+
+Au premier démarrage, un script cloud-init ([`cloud-init.sh.tftpl`](../../infra/terraform/server/cloud-init.sh.tftpl))
+prépare le serveur en une trentaine de secondes :
+
+1. il attend le disque de données (`votely-data`, 20 Gio, chiffré) et ne le formate que la
+   première fois ;
+2. il le monte, et y rattache `/var/lib/rancher` et `/etc/rancher` : tout ce qu'écrit k3s (base
+   du cluster, images, volumes, certificats, identité du nœud) vit sur le disque ;
+3. il installe **k3s** (version fixée, même version mineure de Kubernetes que le cluster kind
+   local), avec les Secrets chiffrés au repos et l'IP publique dans le certificat de l'API.
+
+**Serveur jetable, données persistantes.** Le disque est créé par la stack bootstrap
+(`prevent_destroy`) et rattaché à chaque nouveau serveur. Avec un nom de nœud fixe (`votely`) et
+une adresse privée fixe, un nouveau serveur reprend le même cluster : les mêmes sondages, le même
+certificat HTTPS (aucune nouvelle demande à Let's Encrypt, limité à 5 certificats identiques par
+semaine), le même kubeconfig.
+
+```bash
+terraform destroy && terraform apply   # quelques minutes plus tard : même cluster, mêmes données, même certificat
+```
+
+Le disque ne se rattache que dans sa propre zone de disponibilité (`eu-west-1a`) : la stack
+server lit la zone du volume et y place le sous-réseau.
 
 ## Accès de la CI (OpenID Connect)
 
@@ -212,7 +238,8 @@ machine et la CI utilisent les mêmes builds.
 | Bucket du state (quelques Ko) | quelques centimes par an |
 | Alerte budget | gratuite (les deux premiers budgets d'un compte sont gratuits) |
 | Elastic IP, conservée entre les sessions | ~0,005 USD de l'heure, ~3,60 USD par mois |
-| Serveur (`t3a.large` + disque de 30 Gio) quand il tourne | ~0,09 USD de l'heure, ~0,70 USD pour une session de 8 heures |
+| Serveur (`t3a.large` + disque système de 20 Gio) quand il tourne | ~0,09 USD de l'heure, ~0,70 USD pour une session de 8 heures |
+| Disque de données (20 Gio gp3), conservé entre les sessions | ~1,80 USD par mois |
 | Clé de signature (KMS) | 1 USD par mois, plus quelques centimes pour 10 000 signatures |
 | Rôles de CI et fournisseur OpenID Connect | gratuits |
 

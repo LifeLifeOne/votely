@@ -10,6 +10,9 @@ image:
 host: votely.localhost
 ingress:
   className: traefik
+  # HTTPS: name of the cert-manager ClusterIssuer that provides the certificate (plain HTTP and
+  # no redirection when empty, as on the local cluster).
+  clusterIssuer: ""
 
 # PostgreSQL service (deploy/helm/postgres) and its credentials Secret
 # (keys: `username`, `password`, `database`).

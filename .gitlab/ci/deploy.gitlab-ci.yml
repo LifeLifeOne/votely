@@ -19,11 +19,14 @@ deploy:lint-helm:
     # Chart structure and best practices; --strict fails on warnings too.
     - helm lint --strict deploy/helm/postgres
     - helm lint --strict deploy/helm/votely --values deploy/helm/votely/values-kind.yaml
+    - helm lint --strict deploy/helm/votely --values deploy/helm/votely/values-aws.yaml
     # Render every chart with its values files for the schema validation job.
     - mkdir rendered
     - helm template postgres deploy/helm/postgres > rendered/postgres.yaml
     - helm template votely deploy/helm/votely > rendered/votely.yaml
     - helm template votely deploy/helm/votely --values deploy/helm/votely/values-kind.yaml > rendered/votely-kind.yaml
+    - helm template votely deploy/helm/votely --values deploy/helm/votely/values-aws.yaml > rendered/votely-aws.yaml
+    - cp deploy/aws/cluster-issuers.yaml rendered/
   artifacts:
     expire_in: 1 week
     paths: [rendered/]
@@ -37,5 +40,10 @@ deploy:validate-kubeconform:
     entrypoint: [""]
   script:
     # Every rendered manifest against the Kubernetes API schemas of the cluster version (k3s
-    # stable channel): unknown or misspelled fields fail the job instead of the deployment.
-    - /kubeconform -strict -summary -kubernetes-version 1.36.4 rendered/
+    # stable channel), and custom resources (cert-manager, Traefik) against the community CRD
+    # catalog: unknown or misspelled fields fail the job instead of the deployment.
+    - >
+      /kubeconform -strict -summary -kubernetes-version 1.36.4
+      -schema-location default
+      -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+      rendered/

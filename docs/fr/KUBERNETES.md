@@ -59,6 +59,40 @@ helm -n votely history votely                  # releases et leurs révisions
 helm -n votely rollback votely 1               # revenir à la révision 1
 ```
 
+## Sur le serveur AWS
+
+Les mêmes charts tournent sur le serveur k3s ([INFRA.md](INFRA.md)), à l'adresse
+**https://votely.52.16.15.223.sslip.io** : [sslip.io](https://sslip.io) fait pointer tout nom
+qui se termine par une adresse IP vers cette adresse, sans avoir à acheter de domaine.
+
+L'API Kubernetes n'est jamais exposée sur Internet : `kubectl` passe par un tunnel Systems
+Manager, avec la même connexion SSO que la console AWS.
+
+```
+ton PC : kubectl ──► localhost:6443 ══ tunnel SSM (chiffré, via AWS) ══► serveur : API k3s :6443
+```
+
+```bash
+export AWS_PROFILE=votely
+deploy/aws/fetch-kubeconfig.sh      # une fois : kubeconfig admin dans ~/.kube/votely-aws.yaml (jamais dans Git)
+deploy/aws/tunnel.sh                # à laisser tourner dans un terminal
+
+export KUBECONFIG=~/.kube/votely-aws.yaml
+kubectl get nodes                   # votely   Ready
+deploy/aws/install.sh               # cert-manager, Secrets, PostgreSQL, Votely (idempotent)
+```
+
+| Élément | Rôle |
+|---|---|
+| **cert-manager** | Obtient le certificat auprès de Let's Encrypt et le renouvelle 30 jours avant son expiration |
+| `letsencrypt-staging`, `letsencrypt-prod` ([`cluster-issuers.yaml`](../../deploy/aws/cluster-issuers.yaml)) | Staging pour tester sans limite (certificat non reconnu), production pour le vrai. Le défi HTTP-01 est validé sur le port 80 via Traefik |
+| `values-aws.yaml` | Nom d'hôte public, `ingress.clusterIssuer: letsencrypt-prod`, cookie de session sécurisé |
+| Ingress | Demande le certificat à cert-manager (`cert-manager.io/cluster-issuer`), sert le HTTPS et redirige le HTTP avec un `Middleware` Traefik (`308`) |
+
+`install.sh` est provisoire : Argo CD reprendra le déploiement en GitOps (étape 10). Seuls les
+tests de plateforme (santé, en-têtes de sécurité, routes) tournent contre cet environnement, car
+ils ne créent aucune donnée : [TESTS.md](TESTS.md).
+
 ## Deux charts
 
 | Chart | Contenu |
@@ -92,13 +126,14 @@ version en place continue de servir.
 |---|---|---|
 | `image.tag` | `main` | Version des images : `main` ou une version publiée (`0.1.0`) |
 | `host` | `votely.localhost` | Nom d'hôte routé par l'ingress |
+| `ingress.clusterIssuer` | vide | ClusterIssuer cert-manager : HTTPS et redirection du HTTP quand il est renseigné |
 | `cookieSecure` | `true` | Cookie de session uniquement en HTTPS (`false` sur le cluster local) |
 | `backend.replicas`, `frontend.replicas` | `2` | Pods par composant (`1` en local) |
 | `database.existingSecret` | `votely-db` | Secret avec `username`, `password`, `database` |
 | `jwt.existingSecret` | `votely-jwt` | Secret avec `jwt-secret` |
 
-`values-kind.yaml` contient les réglages du cluster local ; staging et production auront leurs
-propres fichiers.
+`values-kind.yaml` contient les réglages du cluster local, `values-aws.yaml` ceux du serveur
+AWS.
 
 - **Aucun secret dans les charts ni dans Git.** Les charts ne font que référencer des Secrets
   par leur nom. En local, `up.sh` génère des identifiants aléatoires directement dans le
@@ -143,7 +178,8 @@ Chaque pod tourne avec les réglages du Pod Security Standard *restricted* :
 À chaque merge request qui touche `deploy/` (voir [CI.md](CI.md)) :
 
 - `deploy:lint-helm` : `helm lint --strict` sur les deux charts, puis génération de chaque chart
-  avec chacun de ses fichiers de valeurs ;
+  avec chacun de ses fichiers de valeurs (et des émetteurs cert-manager) ;
 - `deploy:validate-kubeconform` : valide chaque manifeste généré contre les schémas de l'API
-  Kubernetes de la version du cluster. Un champ mal orthographié (`runAsNonRot`) fait échouer
+  Kubernetes de la version du cluster, et les ressources personnalisées (cert-manager, Traefik)
+  contre le catalogue communautaire de CRD. Un champ mal orthographié (`runAsNonRot`) fait échouer
   le pipeline plutôt que le déploiement.
