@@ -1,0 +1,14 @@
+{{- if .Values.ingress.clusterIssuer }}
+# Traefik middleware: plain HTTP requests are permanently redirected to HTTPS. The ACME challenge
+# of cert-manager uses its own ingress, so the certificate can still be obtained over HTTP.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-https-redirect
+  labels:
+    {{- include "votely.labels" (dict "root" $ "component" "frontend") | nindent 4 }}
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+{{- end }}
