@@ -17,3 +17,8 @@ output "ci_role_names" {
   description = "IAM roles assumed by GitLab CI (ARN: arn:aws:iam::<account>:role/<name>)."
   value       = { plan = aws_iam_role.ci_plan.name, signer = aws_iam_role.ci_signer.name }
 }
+
+output "data_volume_id" {
+  description = "Persistent disk attached to the server (k3s data)."
+  value       = aws_ebs_volume.data.id
+}
