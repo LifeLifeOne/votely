@@ -18,7 +18,7 @@
       "https://gitops:${GITOPS_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" repo
     - cd repo
     - git config user.name "Votely CI"
-    - git config user.email "votely-ci@${CI_SERVER_HOST}"
+    - git config user.email "ci@votely.invalid" # reserved domain (RFC 2606): clearly not a real mailbox
     - FILE="deploy/environments/$ENVIRONMENT/values.yaml"
     - |
       sed -i "s|^  tag: .*|  tag: \"$NEW_TAG\"|" "$FILE"
