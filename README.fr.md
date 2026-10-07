@@ -118,7 +118,7 @@ uvx pre-commit install  # hooks git (lint + détection de secrets)
 - [Conteneurs](docs/fr/CONTAINERS.md) : images, stack Docker Compose, durcissement, scans
 - [Tests](docs/fr/TESTS.md) : stratégie de test, tests end-to-end, comment les regarder
 - [Intégration continue](docs/fr/CI.md) : organisation du pipeline, règles, stages, versions
-- [Kubernetes](docs/fr/KUBERNETES.md) : charts Helm, cluster local, migrations, sécurité
+- [Kubernetes](docs/fr/KUBERNETES.md) : charts Helm, cluster local, serveur AWS en HTTPS, migrations, sécurité
 - [Infrastructure](docs/fr/INFRA.md) : accès AWS, state Terraform, réseau et serveur, accès CI, clé de signature, coûts
 
 ## Licence
