@@ -1,0 +1,61 @@
+# The prod environment, in its own namespace (votely-prod): its database with its sealed
+# credentials, then the application. Settings and image version: deploy/environments/prod/.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prod-database
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://gitlab.com/StateOfFlowHunter/votely.git
+      targetRevision: main
+      path: deploy/helm/postgres
+      helm:
+        releaseName: postgres
+    # The sealed credentials, decrypted by the Sealed Secrets controller.
+    - repoURL: https://gitlab.com/StateOfFlowHunter/votely.git
+      targetRevision: main
+      path: deploy/environments/prod
+      directory:
+        include: sealed-secrets.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: votely-prod
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+# The application: the chart with this environment's values. The migrations Job runs before the
+# new pods (Helm pre-upgrade hook, a PreSync hook for Argo CD) and retries while the database
+# is starting.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prod-votely
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://gitlab.com/StateOfFlowHunter/votely.git
+      targetRevision: main
+      path: deploy/helm/votely
+      helm:
+        releaseName: votely
+        valueFiles:
+          - $values/deploy/environments/prod/values.yaml
+    - repoURL: https://gitlab.com/StateOfFlowHunter/votely.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: votely-prod
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

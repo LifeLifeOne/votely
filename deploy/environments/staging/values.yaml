@@ -1,0 +1,14 @@
+# Staging: every change merged into main, before it becomes a release.
+host: staging.votely.52.16.15.223.sslip.io
+ingress:
+  clusterIssuer: letsencrypt-prod
+
+image:
+  # The verified and signed image of a main commit (immutable tag).
+  tag: main-0924efc6
+  pullPolicy: IfNotPresent
+
+backend:
+  replicas: 1
+frontend:
+  replicas: 1
