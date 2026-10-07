@@ -26,7 +26,10 @@ deploy:lint-helm:
     - helm template votely deploy/helm/votely > rendered/votely.yaml
     - helm template votely deploy/helm/votely --values deploy/helm/votely/values-kind.yaml > rendered/votely-kind.yaml
     - helm template votely deploy/helm/votely --values deploy/helm/votely/values-aws.yaml > rendered/votely-aws.yaml
-    - cp deploy/aws/cluster-issuers.yaml rendered/
+    # Plain manifests: the cert-manager issuers and the Argo CD applications.
+    - mkdir rendered/platform rendered/argocd
+    - cp deploy/platform/cert-manager/*.yaml rendered/platform/
+    - cp deploy/argocd/root.yaml deploy/argocd/apps/*.yaml rendered/argocd/
   artifacts:
     expire_in: 1 week
     paths: [rendered/]

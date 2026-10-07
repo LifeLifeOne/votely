@@ -1,0 +1,21 @@
+# Argo CD on the k3s server (chart argo-cd, see deploy/aws/install-argocd.sh). The web UI is not
+# exposed on the internet: it is reached through the Systems Manager tunnel with
+# `kubectl port-forward` (deploy/aws/argocd-ui.sh).
+global:
+  domain: localhost:8080
+
+configs:
+  params:
+    # Plain HTTP inside the cluster: the UI is only reached through kubectl port-forward, which
+    # travels inside the encrypted connection to the Kubernetes API.
+    server.insecure: true
+  cm:
+    # A single local admin account, no single sign-on provider.
+    admin.enabled: true
+    exec.enabled: false
+
+# Components not used here: single sign-on (Dex) and notifications.
+dex:
+  enabled: false
+notifications:
+  enabled: false

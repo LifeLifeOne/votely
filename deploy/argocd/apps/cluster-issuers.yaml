@@ -1,0 +1,20 @@
+# Let's Encrypt issuers (deploy/platform/cert-manager/), right after cert-manager (wave -1).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cluster-issuers
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: default
+  source:
+    repoURL: https://gitlab.com/StateOfFlowHunter/votely.git
+    targetRevision: main
+    path: deploy/platform/cert-manager
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
