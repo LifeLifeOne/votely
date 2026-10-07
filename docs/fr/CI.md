@@ -16,7 +16,8 @@ Votely est construit et testé par GitLab CI à chaque merge request et à chaqu
 ├── e2e.gitlab-ci.yml           # jobs e2e:*
 ├── security.gitlab-ci.yml      # jobs security:*
 ├── deploy.gitlab-ci.yml        # jobs deploy:* (charts Helm)
-└── infra.gitlab-ci.yml         # jobs infra:* (Terraform)
+├── infra.gitlab-ci.yml         # jobs infra:* (Terraform)
+└── environments.gitlab-ci.yml  # jobs staging:* et prod:* (déploiement GitOps)
 ```
 
 - Un fichier par composant : tout ce qui concerne le pipeline du backend est au même endroit,
@@ -59,6 +60,7 @@ build     backend:build-image  frontend:build-image
 verify    e2e:test-playwright  security:scan-image-trivy: [backend, frontend]
 publish   backend:sign-image  frontend:sign-image  →  backend:publish-image  frontend:publish-image
           (tags de version : *:promote-image)
+deploy    staging:update-git                       (tags de version : prod:verify-cosign → prod:update-git)
 ```
 
 | Stage | Rôle | Job | Outil et périmètre |
@@ -70,7 +72,9 @@ publish   backend:sign-image  frontend:sign-image  →  backend:publish-image  f
 | | | `frontend:typecheck-tsc`, `e2e:typecheck-tsc` | Compilateur TypeScript, mode strict |
 | | | `security:sast-semgrep` | Semgrep : règles Python, TypeScript, React, OWASP Top 10 et Dockerfile |
 | | | `security:deps-trivy` | Trivy : vulnérabilités connues dans les dépendances de production (`uv.lock`, `package-lock.json`) |
-| | | `deploy:lint-helm`, `deploy:validate-kubeconform` | Helm lint (strict), puis chaque manifeste généré validé contre les schémas de l'API Kubernetes |
+| | | `deploy:lint-helm`, `deploy:validate-kubeconform` | Helm lint (strict), puis chaque manifeste généré validé contre les schémas de l'API Kubernetes et le catalogue de CRD |
+| | | `infra:format-terraform`, `infra:validate-terraform`, `infra:lint-tflint` | Format, validation et tflint (règles AWS) de chaque stack Terraform |
+| | | `infra:plan-terraform` | `terraform plan` en lecture seule via OpenID Connect : les relecteurs voient ce qui changerait sur AWS |
 | `test` | L'exécution du code | `backend:test-pytest` | pytest : tests unitaires et d'intégration face à un service PostgreSQL 16, migrations comprises ; couverture ≥ 90 % |
 | | | `frontend:test-vitest` | Vitest : composants et pages face à une fausse API (MSW) ; couverture ≥ 80 % des lignes |
 | `build` | Les images de production | `backend:build-image`, `frontend:build-image` | Docker BuildKit, poussées dans le registry de conteneurs GitLab |
@@ -79,6 +83,8 @@ publish   backend:sign-image  frontend:sign-image  →  backend:publish-image  f
 | `publish` | Signées, puis taguées | `backend:sign-image`, `frontend:sign-image` | Cosign avec une clé AWS KMS : signature et attestation signée du SBOM (branche principale) |
 | | | `backend:publish-image`, `frontend:publish-image` | crane : `main` et `main-<sha court>` sur les images vérifiées et signées (branche principale) |
 | | | `backend:promote-image`, `frontend:promote-image` | crane : tag de version sur l'image vérifiée sur `main` (tags de version uniquement) |
+| `deploy` | Versions des environnements écrites dans Git | `staging:update-git` | Commite `main-<sha court>` dans les valeurs de staging (branche principale) ; Argo CD le déploie |
+| | | `prod:verify-cosign`, `prod:update-git` | Vérifie les signatures des images de la version, puis commite la version dans les valeurs de production (tags de version uniquement) |
 
 Les jobs sont nommés `<composant>:<action>-<outil>` : ce que fait le job et avec quel outil,
 regroupés par composant dans le graphe.
@@ -228,12 +234,17 @@ signée n'est jamais promue.
   journal public, où elle n'a volontairement pas été publiée. Les images publiées avant la mise
   en place de la signature (`0.1.0`) n'ont pas de signature.
 
-Pour publier une version, une fois le pipeline `main` du commit passé :
+Pour publier une version, taguer le commit de merge qui tourne en staging, une fois son pipeline
+`main` passé (pas un commit `chore(deploy)` de la CI : ils ne lancent aucun pipeline, ils n'ont
+donc pas d'images) :
 
 ```bash
-git tag -a v1.2.0 -m "v1.2.0"
+git tag -a v1.2.0 <commit de merge> -m "v1.2.0"
 git push origin v1.2.0
 ```
+
+Le pipeline de version promeut les images, vérifie leurs signatures et commite la version dans les
+valeurs de production ; Argo CD la déploie ([GITOPS.md](GITOPS.md)).
 
 La politique de nettoyage du registry conserve les tags de version, `main`, le cache de build et
 les signatures (`sha256-…`) ;
