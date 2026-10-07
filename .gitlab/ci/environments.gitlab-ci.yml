@@ -1,0 +1,87 @@
+# Continuous delivery through Git (GitOps): the pipeline never touches the cluster. It writes the
+# image version an environment must run into deploy/environments/<env>/values.yaml, and Argo CD
+# deploys that commit. Every deployment is a commit: history, review and rollback (git revert).
+
+# Commit a new image tag for an environment on the default branch. The token (GITOPS_TOKEN, a
+# project access token limited to write_repository) is a masked and protected variable: only
+# pipelines of the default branch and of release tags receive it, never merge requests.
+.update-environment:
+  stage: deploy
+  image:
+    name: alpine/git:2.49.1
+    entrypoint: [""]
+  variables:
+    GIT_STRATEGY: none # a fresh clone of the default branch, wherever the pipeline runs
+  script:
+    - >
+      git clone --quiet --depth 50 --branch "$CI_DEFAULT_BRANCH"
+      "https://gitops:${GITOPS_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" repo
+    - cd repo
+    - git config user.name "Votely CI"
+    - git config user.email "votely-ci@${CI_SERVER_HOST}"
+    - FILE="deploy/environments/$ENVIRONMENT/values.yaml"
+    - |
+      sed -i "s|^  tag: .*|  tag: \"$NEW_TAG\"|" "$FILE"
+    - |
+      if git diff --quiet; then
+        echo "$ENVIRONMENT already runs $NEW_TAG."
+        exit 0
+      fi
+    # [skip ci]: the commit only changes a version, it must not start another pipeline.
+    - |
+      git commit --quiet --all --message "chore(deploy): $ENVIRONMENT runs $NEW_TAG [skip ci]"
+    # Another commit may land meanwhile: rebase and retry.
+    - |
+      for attempt in 1 2 3; do
+        git push --quiet origin "HEAD:$CI_DEFAULT_BRANCH" && break
+        [ "$attempt" = 3 ] && exit 1
+        git pull --quiet --rebase origin "$CI_DEFAULT_BRANCH"
+      done
+    - git log -1 --format='Deployed by %h, %s'
+
+# Default branch: staging follows main, with the images just verified, signed and tagged.
+staging:update-git:
+  extends: .update-environment
+  needs:
+    - job: backend:publish-image
+      artifacts: false
+    - job: frontend:publish-image
+      artifacts: false
+  variables:
+    ENVIRONMENT: staging
+    NEW_TAG: main-$CI_COMMIT_SHORT_SHA
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# Release tag vX.Y.Z: production only gets an image whose signature checks out with the public
+# key committed in the repository.
+prod:verify-cosign:
+  stage: deploy
+  image:
+    name: ghcr.io/sigstore/cosign/cosign:v3.1.3-dev
+    entrypoint: [""]
+  needs:
+    - job: backend:promote-image
+      artifacts: false
+    - job: frontend:promote-image
+      artifacts: false
+  script:
+    - |
+      for component in backend frontend; do
+        image="$CI_REGISTRY_IMAGE/$component:${CI_COMMIT_TAG#v}"
+        cosign verify --key cosign.pub --insecure-ignore-tlog "$image" > /dev/null
+        cosign verify-attestation --key cosign.pub --insecure-ignore-tlog --type cyclonedx "$image" > /dev/null
+        echo "$image: signature and SBOM attestation verified"
+      done
+  rules:
+    - if: $CI_COMMIT_TAG
+
+prod:update-git:
+  extends: .update-environment
+  needs: [prod:verify-cosign]
+  variables:
+    ENVIRONMENT: prod
+  before_script:
+    - export NEW_TAG="${CI_COMMIT_TAG#v}"
+  rules:
+    - if: $CI_COMMIT_TAG

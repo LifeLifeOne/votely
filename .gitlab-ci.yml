@@ -21,6 +21,7 @@ stages:
   - build # production images
   - verify # the images just built: end-to-end tests, vulnerability scan
   - publish # deployment tags on the verified images
+  - deploy # environment versions written to Git, deployed by Argo CD
 
 default:
   interruptible: true
@@ -37,3 +38,4 @@ include:
   - local: .gitlab/ci/security.gitlab-ci.yml
   - local: .gitlab/ci/deploy.gitlab-ci.yml
   - local: .gitlab/ci/infra.gitlab-ci.yml
+  - local: .gitlab/ci/environments.gitlab-ci.yml
