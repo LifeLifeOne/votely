@@ -1,0 +1,38 @@
+#!/bin/bash
+# First boot of the server: mount the persistent data disk, then install k3s on it.
+# Rendered by Terraform (templatefile); the output is in /var/log/cloud-init-output.log.
+set -euo pipefail
+
+# 1. The data disk is attached right after the instance starts: wait for it. On Nitro instances
+#    it appears as an NVMe device whose serial number is the volume ID.
+disk="/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_${data_volume_id}"
+for _ in $(seq 1 60); do [ -e "$disk" ] && break; sleep 5; done
+[ -e "$disk" ] || { echo "data disk ${data_volume_id} not attached" >&2; exit 1; }
+
+# 2. Format it the first time only, then mount it on every boot.
+blkid "$disk" >/dev/null || mkfs.xfs -L votely-data "$disk"
+mkdir -p /data
+echo "LABEL=votely-data /data xfs defaults,nofail 0 2" >> /etc/fstab
+mount /data
+
+# 3. Everything k3s writes goes to the disk: cluster state, images, volumes (/var/lib/rancher)
+#    and its configuration and node identity (/etc/rancher).
+for dir in /var/lib/rancher /etc/rancher; do
+  mkdir -p "/data$dir" "$dir"
+  echo "/data$dir $dir none bind 0 0" >> /etc/fstab
+  mount "$dir"
+done
+
+# 4. Install k3s. A fixed node name keeps the same Kubernetes node across servers; the public
+#    IP is added to the API certificate; Secrets are encrypted at rest in the cluster database.
+mkdir -p /etc/rancher/k3s
+cat > /etc/rancher/k3s/config.yaml <<CONFIG
+node-name: votely
+tls-san:
+  - ${public_ip}
+write-kubeconfig-mode: "0600"
+secrets-encryption: true
+CONFIG
+
+curl -sfL https://get.k3s.io | \
+  INSTALL_K3S_VERSION="${k3s_version}" INSTALL_K3S_SKIP_SELINUX_RPM=true sh -s - server

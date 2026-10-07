@@ -11,7 +11,13 @@ variable "instance_type" {
 }
 
 variable "root_volume_size_gb" {
-  description = "Size of the encrypted root volume (images, database volumes, logs)."
+  description = "Size of the encrypted system disk (cluster data lives on the persistent disk)."
   type        = number
-  default     = 30
+  default     = 20
+}
+
+variable "k3s_version" {
+  description = "k3s release installed at first boot (same Kubernetes minor as the local kind cluster)."
+  type        = string
+  default     = "v1.36.5+k3s1"
 }
