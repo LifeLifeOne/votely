@@ -82,9 +82,17 @@ git revert <the chore(deploy) commit>
 git push origin main
 ```
 
-The revert keeps `[skip ci]` and Argo CD deploys the previous version. Database migrations are
-not reverted: a migration must stay compatible with the previous version of the application
-(add before you remove), so that rolling back the code is always safe.
+The revert keeps `[skip ci]`, so nothing is rebuilt: the previous images are still in the
+registry. Argo CD deploys the previous version with a rolling update (new pods ready before the
+old ones stop). Tested on production, both ways, in under three minutes each:
+
+```
+eea82df  Reapply "chore(deploy): prod runs 0.3.0 [skip ci]"   # back to 0.3.0
+63bb139  Revert "chore(deploy): prod runs 0.3.0 [skip ci]"    # rolled back to 0.2.0
+```
+
+Database migrations are not reverted: a migration must stay compatible with the previous version
+of the application (add before you remove), so that rolling back the code is always safe.
 
 ## Secrets
 
