@@ -84,9 +84,19 @@ git revert <le commit chore(deploy)>
 git push origin main
 ```
 
-Le revert garde `[skip ci]` et Argo CD déploie la version précédente. Les migrations de la base ne
-sont pas annulées : une migration doit rester compatible avec la version précédente de
-l'application (ajouter avant de retirer), pour que revenir en arrière sur le code soit toujours sûr.
+Le revert garde `[skip ci]` : rien n'est reconstruit, les images précédentes sont toujours dans le
+registry. Argo CD déploie la version précédente avec une mise à jour progressive (les nouveaux pods
+sont prêts avant l'arrêt des anciens). Testé en production, dans les deux sens, en moins de trois
+minutes chaque fois :
+
+```
+eea82df  Reapply "chore(deploy): prod runs 0.3.0 [skip ci]"   # retour en 0.3.0
+63bb139  Revert "chore(deploy): prod runs 0.3.0 [skip ci]"    # retour arrière en 0.2.0
+```
+
+Les migrations de la base ne sont pas annulées : une migration doit rester compatible avec la
+version précédente de l'application (ajouter avant de retirer), pour que revenir en arrière sur le
+code soit toujours sûr.
 
 ## Secrets
 
