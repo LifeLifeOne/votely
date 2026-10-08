@@ -5,7 +5,7 @@ ingress:
 
 image:
   # The verified and signed image of a main commit (immutable tag).
-  tag: "main-6225a17c"
+  tag: "main-77cae7cc"
   pullPolicy: IfNotPresent
 
 backend:
