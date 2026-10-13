@@ -125,6 +125,11 @@ deploy/aws/tunnel.sh        # terminal 1
 deploy/aws/grafana-ui.sh    # terminal 2 : affiche l'identifiant, ouvre http://localhost:3000
 ```
 
+C'est voulu : un outil de monitoring montre l'intérieur du cluster, et ce projet n'a pas de
+lecteur quotidien. Une équipe exposerait Grafana en HTTPS derrière une connexion (un Ingress avec
+un certificat cert-manager, comme celui de l'application, et des comptes *Viewer* en lecture
+seule) ou derrière un SSO.
+
 Les identifiants admin sont générés et chiffrés par `deploy/aws/seal-secrets.sh monitoring`
 ([GITOPS.md](GITOPS.md#secrets)) : un mot de passe généré par le chart changerait à chaque rendu
 d'Argo CD. `grafana-ui.sh` les lit dans le cluster, jamais dans Git.
