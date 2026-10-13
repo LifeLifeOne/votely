@@ -27,6 +27,7 @@ deploy/
 ├── platform/
 │   ├── argocd/values.yaml         # réglages d'Argo CD
 │   ├── cert-manager/              # émetteurs Let's Encrypt
+│   ├── monitoring/                # réglages Prometheus / Grafana + identifiants Grafana chiffrés
 │   └── sealed-secrets/            # certificat public de chiffrement
 └── helm/                          # charts postgres et votely
 ```
@@ -40,6 +41,7 @@ synchronisation déploient la plateforme en premier.
 | `cert-manager` | chart cert-manager (certificats HTTPS) | -2 |
 | `sealed-secrets` | contrôleur Sealed Secrets | -2 |
 | `cluster-issuers` | émetteurs Let's Encrypt de test et de production | -1 |
+| `monitoring` | Prometheus, Alertmanager et Grafana ([OBSERVABILITY.md](OBSERVABILITY.md)) | -1 |
 | `staging-database`, `prod-database` | PostgreSQL et les identifiants chiffrés de l'environnement | 0 |
 | `staging-votely`, `prod-votely` | chart Votely avec les valeurs de l'environnement | 0 |
 

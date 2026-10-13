@@ -27,6 +27,7 @@ deploy/
 ├── platform/
 │   ├── argocd/values.yaml         # Argo CD settings
 │   ├── cert-manager/              # Let's Encrypt issuers
+│   ├── monitoring/                # Prometheus / Grafana settings + sealed Grafana credentials
 │   └── sealed-secrets/            # public sealing certificate
 └── helm/                          # postgres and votely charts
 ```
@@ -40,6 +41,7 @@ platform first.
 | `cert-manager` | cert-manager chart (HTTPS certificates) | -2 |
 | `sealed-secrets` | Sealed Secrets controller | -2 |
 | `cluster-issuers` | Let's Encrypt staging and production issuers | -1 |
+| `monitoring` | Prometheus, Alertmanager and Grafana ([OBSERVABILITY.md](OBSERVABILITY.md)) | -1 |
 | `staging-database`, `prod-database` | PostgreSQL and the environment's sealed credentials | 0 |
 | `staging-votely`, `prod-votely` | Votely chart with the environment's values | 0 |
 
