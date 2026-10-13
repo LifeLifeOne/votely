@@ -120,6 +120,7 @@ uvx pre-commit install  # git hooks (lint + secret scanning)
 - [Continuous integration](docs/en/CI.md): pipeline layout, rules, stages, releases
 - [Kubernetes](docs/en/KUBERNETES.md): Helm charts, local cluster, AWS server with HTTPS, migrations, security settings
 - [GitOps](docs/en/GITOPS.md): Argo CD, staging and production, deploying, rolling back, sealed secrets
+- [Observability](docs/en/OBSERVABILITY.md): Prometheus, Grafana, Alertmanager, access
 - [Infrastructure](docs/en/INFRA.md): AWS access, Terraform state, network and server, CI access, signing key, costs
 
 ## License
