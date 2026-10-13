@@ -25,7 +25,8 @@ chart, in the `monitoring` namespace: [`deploy/argocd/apps/monitoring.yaml`](../
 - **A short history** (3 days, 3 GB at most, on a 5 GiB volume of the persistent data disk).
 - **Stateless Grafana.** Dashboards are files in Git, loaded from ConfigMaps: nothing is built by
   hand, and a new cluster has them straight away.
-- **Memory limits** on every component: the node is shared with the two environments.
+- **Memory limits** on every component: the node is shared with the two environments. Grafana
+  gets 512 MiB: it was `OOMKilled` at 256 MiB while loading the dashboards of the chart.
 
 ## Access
 

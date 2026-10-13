@@ -28,7 +28,8 @@ dans le namespace `monitoring` : [`deploy/argocd/apps/monitoring.yaml`](../../de
 - **Grafana sans état.** Les tableaux de bord sont des fichiers dans Git, chargés depuis des
   ConfigMaps : rien n'est construit à la main, et un nouveau cluster les a tout de suite.
 - **Des limites de mémoire** sur chaque composant : le nœud est partagé avec les deux
-  environnements.
+  environnements. Grafana a 512 Mio : il était tué (`OOMKilled`) à 256 Mio en chargeant les
+  tableaux de bord du chart.
 
 ## Accès
 
