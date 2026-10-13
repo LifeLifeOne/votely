@@ -21,12 +21,13 @@ spec:
     - repoURL: https://gitlab.com/StateOfFlowHunter/votely.git
       targetRevision: main
       ref: values
-    # The sealed Grafana admin credentials, decrypted by the Sealed Secrets controller.
+    # The sealed Grafana admin credentials (decrypted by the Sealed Secrets controller), the Votely
+    # dashboard and the alert rules.
     - repoURL: https://gitlab.com/StateOfFlowHunter/votely.git
       targetRevision: main
       path: deploy/platform/monitoring
       directory:
-        include: sealed-secrets.yaml
+        include: "{sealed-secrets,dashboard-votely,alerts}.yaml"
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring

@@ -51,6 +51,42 @@ dans le namespace `monitoring` : [`deploy/argocd/apps/monitoring.yaml`](../../de
   Prometheus où regarder. Il est désactivé par défaut, car le cluster local n'a pas la pile de
   monitoring.
 
+## Le tableau de bord Votely
+
+[`dashboard-votely.yaml`](../../deploy/platform/monitoring/dashboard-votely.yaml) est un ConfigMap
+avec le label `grafana_dashboard` : le sidecar de Grafana le trouve et charge tout seul le
+tableau de bord **Votely**. Il est en lecture seule dans Grafana (la source est le JSON dans Git) et
+a un sélecteur *Environment* (staging, production, ou les deux).
+
+| Panneau | Question à laquelle il répond |
+|---|---|
+| Requests per second, Error rate (5xx), Latency p95, Votes (24 h), Backend pods available | Comment va l'application en ce moment ? |
+| Requests per second, Latency (p50, p95, p99) | Trafic et temps de réponse dans le temps |
+| Server errors, Votes per minute | Ce qui va mal, et ce que font les utilisateurs |
+| Memory by pod, Container restarts | Un pod est-il près de sa limite, ou en train de mourir ? |
+
+Sans trafic, les compteurs affichent *no traffic* au lieu de `NaN`, et le panneau des erreurs
+serveur reste sur une ligne à zéro. *Backend pods available* devient rouge à 0 : c'est ce que
+mesure la première alerte ci-dessous.
+
+## Alertes
+
+[`alerts.yaml`](../../deploy/platform/monitoring/alerts.yaml) est une `PrometheusRule` : Prometheus
+l'évalue toutes les 30 secondes, Alertmanager affiche ce qui se déclenche (Grafana : *Alerting* ;
+aucune notification n'est envoyée). Quatre symptômes que verrait un utilisateur :
+
+| Alerte | Se déclenche quand | Après | Gravité |
+|---|---|---|---|
+| `VotelyBackendUnavailable` | aucun pod du backend n'est disponible dans un environnement | 1 min | critical |
+| `VotelyHighErrorRate` | plus de 5 % des réponses sont des 5xx | 5 min | warning |
+| `VotelySlowRequests` | le temps de réponse p95 dépasse 1 s | 10 min | warning |
+| `VotelyPodRestartingOften` | un conteneur a redémarré plus de 3 fois en 15 minutes | tout de suite | warning |
+
+La première compte les pods (`kube_deployment_status_replicas_available`) plutôt que les
+collectes : un pod arrêté ne laisse aucune métrique derrière lui, donc une alerte basée sur `up` ne
+se déclencherait jamais. `Watchdog`, une alerte qui sonne en permanence, vient avec la pile : elle
+prouve que la chaîne d'alerte est vivante.
+
 ## Accès
 
 Rien n'est exposé sur Internet. Via le tunnel Systems Manager :

@@ -36,6 +36,7 @@ deploy:lint-helm:
     - cp deploy/platform/cert-manager/*.yaml rendered/platform/
     - for env in staging prod; do cp "deploy/environments/$env/sealed-secrets.yaml" "rendered/sealed/$env.yaml"; done
     - cp deploy/platform/monitoring/sealed-secrets.yaml rendered/sealed/monitoring.yaml
+    - cp deploy/platform/monitoring/dashboard-votely.yaml deploy/platform/monitoring/alerts.yaml rendered/platform/
     - cp deploy/argocd/root.yaml deploy/argocd/apps/*.yaml rendered/argocd/
   artifacts:
     expire_in: 1 week
