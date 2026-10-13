@@ -53,9 +53,10 @@ grafana:
   # Stateless: dashboards come from Git, nothing is created by hand.
   persistence:
     enabled: false
+  # Loading the dashboards of the chart takes about 225 MiB: 256 MiB got Grafana OOMKilled.
   resources:
-    requests: { cpu: 50m, memory: 128Mi }
-    limits: { memory: 256Mi }
+    requests: { cpu: 50m, memory: 256Mi }
+    limits: { memory: 512Mi }
 
 prometheusOperator:
   resources:
