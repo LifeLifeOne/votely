@@ -12,8 +12,32 @@
 ![Helm](https://img.shields.io/badge/Helm-0F1689?logo=helm&logoColor=white)
 ![Playwright](https://img.shields.io/badge/Playwright-2EAD33?logo=playwright&logoColor=white)
 ![Trivy](https://img.shields.io/badge/Trivy-1904DA?logo=aqua&logoColor=white)
+![Terraform](https://img.shields.io/badge/Terraform-844FBA?logo=terraform&logoColor=white)
+![AWS](https://img.shields.io/badge/AWS-232F3E?logo=amazonwebservices&logoColor=white)
+![Argo CD](https://img.shields.io/badge/Argo_CD-EF7B4D?logo=argo&logoColor=white)
+![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?logo=prometheus&logoColor=white)
+![Grafana](https://img.shields.io/badge/Grafana-F46800?logo=grafana&logoColor=white)
 
 Votely est une application de sondages légère : créer un sondage, le partager, recueillir des votes (un par compte) et suivre les résultats en direct.
+
+📖 **[Lire l'étude de cas](https://vivienbarbeau.fr/votely/)** : le parcours du commit à la production, avec captures d'écran et vidéo.
+
+## Du commit à la production
+
+```mermaid
+flowchart LR
+    mr([Merge request]) -->|"lint, tests, contrôles de sécurité"| main([merge dans main])
+    main -->|"build unique, tests end-to-end, scans, signature"| staging[("Git : staging runs main-sha")]
+    tag([git tag vX.Y.Z]) -->|"promotion, vérification des signatures"| prod[("Git : prod runs X.Y.Z")]
+    staging --> argocd[Argo CD]
+    prod --> argocd
+    argocd --> envs[staging et production]
+    envs -.-> obs["Prometheus, Grafana, alertes"]
+```
+
+Le pipeline ne touche jamais au cluster : il écrit dans Git la version à déployer, et [Argo CD](docs/fr/GITOPS.md) l'applique. Chaque merge part en staging ; la production ne reçoit qu'un tag de version, une fois les signatures de ses images vérifiées. Revenir en arrière, c'est un `git revert`.
+
+Le serveur AWS est créé à la demande et détruit entre deux sessions de travail (environ 6 USD par mois de coûts fixes) : les environnements ne sont donc pas en ligne en permanence, l'étude de cas les montre en fonctionnement.
 
 ## Stack
 
@@ -25,19 +49,25 @@ Votely est une application de sondages légère : créer un sondage, le partager
 | Conteneurs | Images Docker multi-étapes · nginx · Docker Compose |
 | Tests | pytest · Vitest · Testing Library · MSW · Playwright |
 | CI/CD | GitLab CI · gitleaks · Semgrep · Trivy · crane |
-| Kubernetes | Charts Helm · ingress Traefik · kind (cluster local) |
+| Kubernetes | Charts Helm · ingress Traefik · kind (cluster local) · k3s (AWS) |
+| Infrastructure | Terraform · AWS (EC2, S3, KMS, Systems Manager) |
+| GitOps | Argo CD · Sealed Secrets · cert-manager |
+| Chaîne d'approvisionnement | Cosign · AWS KMS · SBOM CycloneDX |
+| Observabilité | Prometheus · Grafana · Alertmanager |
 
 ## Organisation du dépôt
 
 ```
 .
+├── .gitlab/ci/       # Pipeline CI, un fichier par composant
 ├── backend/          # API REST (FastAPI)
+├── deploy/           # Charts Helm, applications Argo CD, environnements, plateforme, scripts
+├── docs/             # Documentation technique (en/, fr/)
 ├── e2e/              # Tests end-to-end (Playwright)
 ├── frontend/         # Application web (React)
+├── infra/terraform/  # AWS : ressources permanentes (bootstrap) et serveur jetable
 ├── compose.yaml      # Stack complète (Docker Compose)
-├── compose.e2e.yaml  # Stack jetable pour les tests end-to-end
-├── deploy/           # Kubernetes : charts Helm, cluster local (kind)
-└── docs/             # Documentation technique (en/, fr/)
+└── compose.e2e.yaml  # Stack jetable pour les tests end-to-end
 ```
 
 ## Démarrage

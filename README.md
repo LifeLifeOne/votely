@@ -12,8 +12,32 @@
 ![Helm](https://img.shields.io/badge/Helm-0F1689?logo=helm&logoColor=white)
 ![Playwright](https://img.shields.io/badge/Playwright-2EAD33?logo=playwright&logoColor=white)
 ![Trivy](https://img.shields.io/badge/Trivy-1904DA?logo=aqua&logoColor=white)
+![Terraform](https://img.shields.io/badge/Terraform-844FBA?logo=terraform&logoColor=white)
+![AWS](https://img.shields.io/badge/AWS-232F3E?logo=amazonwebservices&logoColor=white)
+![Argo CD](https://img.shields.io/badge/Argo_CD-EF7B4D?logo=argo&logoColor=white)
+![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?logo=prometheus&logoColor=white)
+![Grafana](https://img.shields.io/badge/Grafana-F46800?logo=grafana&logoColor=white)
 
 Votely is a lightweight polling application: create a poll, share it, collect votes (one per account) and follow the results live.
+
+📖 **[Read the case study](https://vivienbarbeau.fr/votely/)**: the path from a commit to production, with screenshots and a video.
+
+## From commit to production
+
+```mermaid
+flowchart LR
+    mr([Merge request]) -->|"lint, tests, security gates"| main([merge into main])
+    main -->|"build once, end-to-end tests, scans, signature"| staging[("Git: staging runs main-sha")]
+    tag([git tag vX.Y.Z]) -->|"promote, verify signatures"| prod[("Git: prod runs X.Y.Z")]
+    staging --> argocd[Argo CD]
+    prod --> argocd
+    argocd --> envs[staging and production]
+    envs -.-> obs["Prometheus, Grafana, alerts"]
+```
+
+The pipeline never touches the cluster: it writes the version to deploy in Git, and [Argo CD](docs/en/GITOPS.md) applies it. Every merge goes to staging; production only receives a version tag, after its image signatures are verified. Rolling back is a `git revert`.
+
+The AWS server is created on demand and destroyed between work sessions (fixed costs of about 6 USD a month), so the environments are not online permanently: the case study shows them running.
 
 ## Stack
 
@@ -25,19 +49,25 @@ Votely is a lightweight polling application: create a poll, share it, collect vo
 | Containers | Docker multi-stage images · nginx · Docker Compose |
 | Tests | pytest · Vitest · Testing Library · MSW · Playwright |
 | CI/CD | GitLab CI · gitleaks · Semgrep · Trivy · crane |
-| Kubernetes | Helm charts · Traefik ingress · kind (local cluster) |
+| Kubernetes | Helm charts · Traefik ingress · kind (local cluster) · k3s (AWS) |
+| Infrastructure | Terraform · AWS (EC2, S3, KMS, Systems Manager) |
+| GitOps | Argo CD · Sealed Secrets · cert-manager |
+| Supply chain | Cosign · AWS KMS · CycloneDX SBOM |
+| Observability | Prometheus · Grafana · Alertmanager |
 
 ## Repository layout
 
 ```
 .
+├── .gitlab/ci/       # CI pipeline, one file per component
 ├── backend/          # REST API (FastAPI)
+├── deploy/           # Helm charts, Argo CD applications, environments, platform, scripts
+├── docs/             # Technical documentation (en/, fr/)
 ├── e2e/              # End-to-end tests (Playwright)
 ├── frontend/         # Web application (React)
+├── infra/terraform/  # AWS: permanent resources (bootstrap) and disposable server
 ├── compose.yaml      # Full stack (Docker Compose)
-├── compose.e2e.yaml  # Disposable stack for end-to-end tests
-├── deploy/           # Kubernetes: Helm charts, local cluster (kind)
-└── docs/             # Technical documentation (en/, fr/)
+└── compose.e2e.yaml  # Disposable stack for end-to-end tests
 ```
 
 ## Getting started
