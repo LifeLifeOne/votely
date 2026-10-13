@@ -1,0 +1,39 @@
+# Monitoring: Prometheus (metrics), Alertmanager (alerts) and Grafana (dashboards), from the
+# kube-prometheus-stack chart. Settings: deploy/platform/monitoring/values.yaml. Deployed before
+# the environments (wave -1): their ServiceMonitors need the operator's custom resources.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: default
+  sources:
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      targetRevision: 92.3.0 # Prometheus Operator v0.94.1
+      helm:
+        releaseName: monitoring
+        valueFiles:
+          - $values/deploy/platform/monitoring/values.yaml
+    - repoURL: https://gitlab.com/StateOfFlowHunter/votely.git
+      targetRevision: main
+      ref: values
+    # The sealed Grafana admin credentials, decrypted by the Sealed Secrets controller.
+    - repoURL: https://gitlab.com/StateOfFlowHunter/votely.git
+      targetRevision: main
+      path: deploy/platform/monitoring
+      directory:
+        include: sealed-secrets.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true # large CRDs exceed the client-side apply annotation limit
