@@ -28,6 +28,12 @@ jwt:
 cookieSecure: true
 logLevel: INFO
 
+# Prometheus scraping of the API (/metrics). Needs the ServiceMonitor custom resource of the
+# monitoring stack: off by default, on in the AWS environments.
+metrics:
+  enabled: false
+  interval: 30s
+
 backend:
   replicas: 2
   resources:

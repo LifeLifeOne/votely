@@ -1,0 +1,19 @@
+{{- if .Values.metrics.enabled }}
+{{- $ctx := dict "root" $ "component" "backend" }}
+# Tells Prometheus (monitoring stack, deploy/platform/monitoring) to read the API's /metrics.
+# Needs the ServiceMonitor custom resource, hence disabled where the stack is not installed.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}-backend
+  labels:
+    {{- include "votely.labels" $ctx | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "votely.selectorLabels" $ctx | nindent 6 }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: {{ .Values.metrics.interval }}
+{{- end }}

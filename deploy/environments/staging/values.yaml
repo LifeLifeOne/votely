@@ -8,6 +8,9 @@ image:
   tag: "main-471d3967"
   pullPolicy: IfNotPresent
 
+metrics:
+  enabled: true
+
 backend:
   replicas: 1
 frontend:
