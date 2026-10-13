@@ -1,0 +1,53 @@
+# Alert rules for the Votely environments. Prometheus evaluates them, Alertmanager shows the ones
+# that fire (Grafana: Alerting, or the Alertmanager page). Four symptoms, each one something a
+# user would notice: no API, errors, slowness, a pod that keeps dying.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: votely
+  namespace: monitoring
+spec:
+  groups:
+    - name: votely
+      rules:
+        - alert: VotelyBackendUnavailable
+          # Counts pods, not scrapes: it still works when a stopped pod leaves no metrics behind.
+          expr: |
+            kube_deployment_status_replicas_available{namespace=~"votely-(staging|prod)", deployment="votely-backend"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "The API of {{ $labels.namespace }} has no available pod"
+            description: "No backend pod is ready in {{ $labels.namespace }} for 1 minute: the application cannot serve requests."
+
+        - alert: VotelyHighErrorRate
+          expr: |
+            sum by (namespace) (rate(http_requests_total{namespace=~"votely-(staging|prod)", status="5xx"}[5m]))
+              / sum by (namespace) (rate(http_requests_total{namespace=~"votely-(staging|prod)"}[5m]))
+            > 0.05
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "More than 5 % of the requests fail in {{ $labels.namespace }}"
+            description: "{{ $value | humanizePercentage }} of the responses were server errors over the last 5 minutes."
+
+        - alert: VotelySlowRequests
+          expr: |
+            histogram_quantile(0.95, sum by (namespace, le) (rate(http_request_duration_highr_seconds_bucket{namespace=~"votely-(staging|prod)"}[5m]))) > 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "95 % of the requests take more than 1 s in {{ $labels.namespace }}"
+            description: "The 95th percentile of the response time is {{ $value | humanizeDuration }} (10 minutes in a row)."
+
+        - alert: VotelyPodRestartingOften
+          expr: |
+            increase(kube_pod_container_status_restarts_total{namespace=~"votely-(staging|prod)"}[15m]) > 3
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.pod }} restarted {{ $value | printf \"%.0f\" }} times in 15 minutes"
+            description: "The container {{ $labels.container }} of {{ $labels.pod }} ({{ $labels.namespace }}) keeps restarting: look at its logs and its memory limit."
