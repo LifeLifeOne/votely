@@ -87,6 +87,35 @@ collectes : un pod arrêté ne laisse aucune métrique derrière lui, donc une a
 se déclencherait jamais. `Watchdog`, une alerte qui sonne en permanence, vient avec la pile : elle
 prouve que la chaîne d'alerte est vivante.
 
+## Tester une alerte
+
+Une alerte qui ne s'est jamais déclenchée n'est pas prouvée. Pour déclencher
+`VotelyBackendUnavailable` sur staging, on arrête son backend. Argo CD défend ce que dit Git **à
+deux niveaux** : `staging-votely` répare le déploiement, et `root` (l'app of apps) répare
+l'`Application` elle-même en quelques secondes. Il faut suspendre les deux, sinon le test s'arrête
+avant que l'alerte ait le temps de se déclencher :
+
+```bash
+kubectl -n argocd patch application root --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"selfHeal":false}}}}'
+kubectl -n argocd patch application staging-votely --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"selfHeal":false}}}}'
+kubectl -n votely-staging scale deployment votely-backend --replicas=0
+```
+
+Mesuré : *Pending* 36 secondes après l'arrêt, *Firing* au bout de 1 minute 38 (le `for: 1m` de la
+règle plus l'intervalle d'évaluation). Puis on répare, dans l'autre sens :
+
+```bash
+kubectl -n votely-staging scale deployment votely-backend --replicas=1
+kubectl -n argocd patch application root --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"selfHeal":true}}}}'
+kubectl -n argocd patch application staging-votely --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"selfHeal":true}}}}'
+```
+
+L'alerte s'éteint environ une minute après le retour du backend.
+
 ## Accès
 
 Rien n'est exposé sur Internet. Via le tunnel Systems Manager :

@@ -82,6 +82,34 @@ The first one counts pods (`kube_deployment_status_replicas_available`) rather t
 stopped pod leaves no metrics behind, so an alert based on `up` would never fire. `Watchdog`, an
 alert that always fires, comes with the stack: it proves the alerting chain is alive.
 
+## Testing an alert
+
+An alert that has never fired is not proven. To fire `VotelyBackendUnavailable` on staging, stop
+its backend. Argo CD defends what Git says **on two levels**: `staging-votely` repairs the
+deployment, and `root` (the app of apps) repairs the `Application` itself within seconds. Suspend
+both, or the test ends before the alert has time to fire:
+
+```bash
+kubectl -n argocd patch application root --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"selfHeal":false}}}}'
+kubectl -n argocd patch application staging-votely --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"selfHeal":false}}}}'
+kubectl -n votely-staging scale deployment votely-backend --replicas=0
+```
+
+Measured: *Pending* 36 seconds after the stop, *Firing* after 1 minute 38 (the rule's `for: 1m`
+plus the evaluation interval). Then repair, in the other order:
+
+```bash
+kubectl -n votely-staging scale deployment votely-backend --replicas=1
+kubectl -n argocd patch application root --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"selfHeal":true}}}}'
+kubectl -n argocd patch application staging-votely --type merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"selfHeal":true}}}}'
+```
+
+The alert clears about a minute after the backend is back.
+
 ## Access
 
 Nothing is exposed on the internet. Through the Systems Manager tunnel:
