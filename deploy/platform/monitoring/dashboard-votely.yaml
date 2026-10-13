@@ -123,7 +123,7 @@ data:
           "gridPos": {
             "x": 5,
             "y": 0,
-            "w": 5,
+            "w": 4,
             "h": 4
           },
           "targets": [
@@ -181,7 +181,7 @@ data:
             "uid": "${datasource}"
           },
           "gridPos": {
-            "x": 10,
+            "x": 9,
             "y": 0,
             "w": 5,
             "h": 4
@@ -242,9 +242,9 @@ data:
             "uid": "${datasource}"
           },
           "gridPos": {
-            "x": 15,
+            "x": 14,
             "y": 0,
-            "w": 5,
+            "w": 4,
             "h": 4
           },
           "targets": [
@@ -288,16 +288,16 @@ data:
         {
           "id": 5,
           "type": "stat",
-          "title": "Pods ready",
-          "description": "",
+          "title": "Backend pods available",
+          "description": "Ready API pods. At 0 for a minute, the VotelyBackendUnavailable alert fires.",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
           "gridPos": {
-            "x": 20,
+            "x": 18,
             "y": 0,
-            "w": 4,
+            "w": 6,
             "h": 4
           },
           "targets": [
@@ -306,7 +306,7 @@ data:
                 "type": "prometheus",
                 "uid": "${datasource}"
               },
-              "expr": "sum(kube_pod_status_ready{namespace=~\"$namespace\",condition=\"true\"})",
+              "expr": "sum(kube_deployment_status_replicas_available{namespace=~\"$namespace\",deployment=\"votely-backend\"})",
               "legendFormat": "",
               "refId": "A"
             }
@@ -458,7 +458,7 @@ data:
           "id": 8,
           "type": "timeseries",
           "title": "Server errors (5xx)",
-          "description": "Responses in the 5xx class, per second.",
+          "description": "Responses in the 5xx class, per second. A flat zero line means no server error.",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
@@ -475,8 +475,8 @@ data:
                 "type": "prometheus",
                 "uid": "${datasource}"
               },
-              "expr": "sum by (namespace)(rate(http_requests_total{namespace=~\"$namespace\",status=\"5xx\"}[5m]))",
-              "legendFormat": "{{namespace}}",
+              "expr": "sum by (namespace)(rate(http_requests_total{namespace=~\"$namespace\",status=\"5xx\"}[5m])) or on() vector(0)",
+              "legendFormat": "5xx {{namespace}}",
               "refId": "A"
             }
           ],
@@ -579,7 +579,7 @@ data:
               "unit": "bytes",
               "custom": {
                 "lineWidth": 2,
-                "fillOpacity": 12,
+                "fillOpacity": 0,
                 "showPoints": "never"
               }
             },
@@ -626,7 +626,7 @@ data:
               "unit": "short",
               "custom": {
                 "lineWidth": 2,
-                "fillOpacity": 12,
+                "fillOpacity": 0,
                 "showPoints": "never"
               }
             },

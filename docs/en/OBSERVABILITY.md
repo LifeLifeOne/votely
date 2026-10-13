@@ -56,12 +56,14 @@ own. It is read-only in Grafana (the JSON in Git is the source) and has an *Envi
 
 | Panel | Query it answers |
 |---|---|
-| Requests per second, Error rate (5xx), Latency p95, Votes (24 h), Pods ready | How is the application doing right now? |
+| Requests per second, Error rate (5xx), Latency p95, Votes (24 h), Backend pods available | How is the application doing right now? |
 | Requests per second, Latency (p50, p95, p99) | Traffic and response time over time |
 | Server errors, Votes per minute | What goes wrong, and what users do |
 | Memory by pod, Container restarts | Is a pod close to its limit, or dying? |
 
-With no traffic, the stats say *no traffic* instead of showing `NaN`.
+With no traffic, the stats say *no traffic* instead of showing `NaN`, and the server errors panel
+stays on a flat zero line. *Backend pods available* turns red at 0: it is what the first alert
+below measures.
 
 ## Alerts
 

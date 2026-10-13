@@ -60,12 +60,14 @@ a un sélecteur *Environment* (staging, production, ou les deux).
 
 | Panneau | Question à laquelle il répond |
 |---|---|
-| Requests per second, Error rate (5xx), Latency p95, Votes (24 h), Pods ready | Comment va l'application en ce moment ? |
+| Requests per second, Error rate (5xx), Latency p95, Votes (24 h), Backend pods available | Comment va l'application en ce moment ? |
 | Requests per second, Latency (p50, p95, p99) | Trafic et temps de réponse dans le temps |
 | Server errors, Votes per minute | Ce qui va mal, et ce que font les utilisateurs |
 | Memory by pod, Container restarts | Un pod est-il près de sa limite, ou en train de mourir ? |
 
-Sans trafic, les compteurs affichent *no traffic* au lieu de `NaN`.
+Sans trafic, les compteurs affichent *no traffic* au lieu de `NaN`, et le panneau des erreurs
+serveur reste sur une ligne à zéro. *Backend pods available* devient rouge à 0 : c'est ce que
+mesure la première alerte ci-dessous.
 
 ## Alertes
 
