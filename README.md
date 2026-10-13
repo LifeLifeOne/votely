@@ -1,6 +1,6 @@
 # Votely
 
-[![English](https://img.shields.io/badge/lang-English-blue)](README.md) [![Français](https://img.shields.io/badge/lang-Fran%C3%A7ais-lightgrey)](README.fr.md) [![pipeline](https://gitlab.com/StateOfFlowHunter/votely/badges/main/pipeline.svg)](https://gitlab.com/StateOfFlowHunter/votely/-/pipelines) [![coverage](https://gitlab.com/StateOfFlowHunter/votely/badges/main/coverage.svg)](https://gitlab.com/StateOfFlowHunter/votely/-/pipelines) [![version](https://img.shields.io/gitlab/v/tag/StateOfFlowHunter%2Fvotely?label=version)](https://gitlab.com/StateOfFlowHunter/votely/-/tags)
+[![English](https://img.shields.io/badge/lang-English-blue)](README.md) [![Français](https://img.shields.io/badge/lang-Fran%C3%A7ais-lightgrey)](README.fr.md) [![pipeline](https://gitlab.com/StateOfFlowHunter/votely/badges/main/pipeline.svg?ignore_skipped=true)](https://gitlab.com/StateOfFlowHunter/votely/-/pipelines) [![coverage](https://gitlab.com/StateOfFlowHunter/votely/badges/main/coverage.svg)](https://gitlab.com/StateOfFlowHunter/votely/-/pipelines) [![version](https://img.shields.io/gitlab/v/tag/StateOfFlowHunter%2Fvotely?label=version)](https://gitlab.com/StateOfFlowHunter/votely/-/tags)
 
 > [!TIP]
 > 🛠️ **This is a DevOps showcase project**: the app is deliberately simple, the focus is on how it
