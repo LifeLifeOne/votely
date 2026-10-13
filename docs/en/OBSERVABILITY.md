@@ -28,6 +28,25 @@ chart, in the `monitoring` namespace: [`deploy/argocd/apps/monitoring.yaml`](../
 - **Memory limits** on every component: the node is shared with the two environments. Grafana
   gets 512 MiB: it was `OOMKilled` at 256 MiB while loading the dashboards of the chart.
 
+## What the API exposes
+
+`GET /metrics` on the backend, in the Prometheus format (about 200 series per pod):
+
+| Metric | Meaning |
+|---|---|
+| `http_requests_total` | Requests by method, route and status class (`2xx`, `4xx`, `5xx`) |
+| `http_request_duration_highr_seconds` | Duration of each request, as a histogram: latency percentiles |
+| `votely_votes_total` | Votes recorded: the business metric. A rejected vote is not counted |
+
+- **Bounded cardinality.** Requests are grouped by route *template* (`/api/v1/polls/{poll_id}`),
+  never by the real URL, and unknown URLs fall into one `none` group: scanners cannot make the
+  number of series grow.
+- **Probes are left out** (`/healthz`, `/readyz`): they would drown the traffic figures.
+- **Not public.** The frontend proxy only forwards `/api/`, so the page is reachable inside the
+  cluster, where Prometheus reads it, and nowhere else. A platform test checks it.
+- **Discovery.** A `ServiceMonitor` in the `votely` chart (`metrics.enabled`) tells Prometheus
+  where to look. It is off by default, because the local cluster has no monitoring stack.
+
 ## Access
 
 Nothing is exposed on the internet. Through the Systems Manager tunnel:

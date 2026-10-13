@@ -75,7 +75,7 @@ Every scenario runs twice: **desktop** Chrome and **mobile** (Pixel 7 emulation)
 |---|---|
 | `auth.spec.ts` | Sign up (session cookie is `HttpOnly` + `SameSite=Lax`), log in through the form, wrong credentials, log out |
 | `polls.spec.ts` | Create a poll, vote and see the results · a second vote is impossible in the UI and refused by the API (`409`) · results update live when another user votes · anonymous visitors can read but must log in to vote · login redirects back to poll creation |
-| `platform.spec.ts` | Health endpoints · security headers (CSP, `nosniff`, hidden nginx version) · direct access to client-side routes · no console errors |
+| `platform.spec.ts` | Health endpoints · security headers (CSP, `nosniff`, hidden nginx version) · API metrics not public · direct access to client-side routes · no console errors |
 
 ### Writing rules
 
