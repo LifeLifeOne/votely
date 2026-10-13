@@ -17,6 +17,12 @@ test.describe('platform', () => {
     expect(headers['server']).toBe('nginx') // no version disclosed
   })
 
+  test('the API metrics are not served to the public', async ({ request }) => {
+    // The frontend proxy only forwards /api/: Prometheus reads /metrics from inside the cluster.
+    expect(await (await request.get('/metrics')).text()).not.toContain('votely_votes_total')
+    expect(await (await request.get('/api/metrics')).text()).not.toContain('votely_votes_total')
+  })
+
   test('client-side routes work on direct access', async ({ page }) => {
     const response = await page.goto('/polls/new')
 

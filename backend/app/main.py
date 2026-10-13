@@ -4,6 +4,7 @@ from app.api import auth, health, polls
 from app.api.errors import register_error_handlers
 from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.core.metrics import setup_metrics
 
 
 def create_app() -> FastAPI:
@@ -15,6 +16,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(polls.router)
     register_error_handlers(app)
+    setup_metrics(app)
     return app
 
 

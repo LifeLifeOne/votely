@@ -75,7 +75,7 @@ Chaque scénario tourne deux fois : Chrome **bureau** et **mobile** (émulation 
 |---|---|
 | `auth.spec.ts` | Inscription (le cookie de session est `HttpOnly` + `SameSite=Lax`), connexion par le formulaire, identifiants incorrects, déconnexion |
 | `polls.spec.ts` | Créer un sondage, voter et voir les résultats · un second vote est impossible dans l'interface et refusé par l'API (`409`) · les résultats se mettent à jour en direct quand un autre utilisateur vote · un visiteur anonyme peut consulter mais doit se connecter pour voter · la connexion ramène à la création de sondage |
-| `platform.spec.ts` | Endpoints de santé · en-têtes de sécurité (CSP, `nosniff`, version de nginx masquée) · accès direct aux routes côté client · aucune erreur dans la console |
+| `platform.spec.ts` | Endpoints de santé · en-têtes de sécurité (CSP, `nosniff`, version de nginx masquée) · métriques de l'API non publiques · accès direct aux routes côté client · aucune erreur dans la console |
 
 ### Règles d'écriture
 

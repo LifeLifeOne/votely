@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query, status
 
 from app.api.deps import CurrentUser, DbSession, OptionalUser
 from app.api.schemas import PollCreate, PollRead, PollResultsRead, VoteCreate
+from app.core.metrics import VOTES
 from app.domain.polls import PollService, is_closed, utc_now
 from app.repositories.models import Poll
 from app.repositories.polls import SqlPollRepository
@@ -62,6 +63,7 @@ def get_poll(poll_id: uuid.UUID, service: Service, user: OptionalUser) -> PollRe
 @router.post("/{poll_id}/votes", status_code=status.HTTP_204_NO_CONTENT)
 def vote(poll_id: uuid.UUID, payload: VoteCreate, service: Service, user: CurrentUser) -> None:
     service.vote(poll_id, payload.option_id, user.id)
+    VOTES.inc()
 
 
 @router.get("/{poll_id}/results")
