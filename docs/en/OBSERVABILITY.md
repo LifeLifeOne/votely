@@ -47,6 +47,39 @@ chart, in the `monitoring` namespace: [`deploy/argocd/apps/monitoring.yaml`](../
 - **Discovery.** A `ServiceMonitor` in the `votely` chart (`metrics.enabled`) tells Prometheus
   where to look. It is off by default, because the local cluster has no monitoring stack.
 
+## The Votely dashboard
+
+[`dashboard-votely.yaml`](../../deploy/platform/monitoring/dashboard-votely.yaml) is a ConfigMap
+labelled `grafana_dashboard`: Grafana's sidecar finds it and loads the **Votely** dashboard on its
+own. It is read-only in Grafana (the JSON in Git is the source) and has an *Environment* selector
+(staging, production, or both).
+
+| Panel | Query it answers |
+|---|---|
+| Requests per second, Error rate (5xx), Latency p95, Votes (24 h), Pods ready | How is the application doing right now? |
+| Requests per second, Latency (p50, p95, p99) | Traffic and response time over time |
+| Server errors, Votes per minute | What goes wrong, and what users do |
+| Memory by pod, Container restarts | Is a pod close to its limit, or dying? |
+
+With no traffic, the stats say *no traffic* instead of showing `NaN`.
+
+## Alerts
+
+[`alerts.yaml`](../../deploy/platform/monitoring/alerts.yaml) is a `PrometheusRule`: Prometheus
+evaluates it every 30 seconds, Alertmanager shows what fires (Grafana: *Alerting*; no notification
+is sent). Four symptoms a user would notice:
+
+| Alert | Fires when | After | Severity |
+|---|---|---|---|
+| `VotelyBackendUnavailable` | no backend pod is available in an environment | 1 min | critical |
+| `VotelyHighErrorRate` | more than 5 % of the responses are 5xx | 5 min | warning |
+| `VotelySlowRequests` | the p95 response time exceeds 1 s | 10 min | warning |
+| `VotelyPodRestartingOften` | a container restarted more than 3 times in 15 minutes | immediately | warning |
+
+The first one counts pods (`kube_deployment_status_replicas_available`) rather than scrapes: a
+stopped pod leaves no metrics behind, so an alert based on `up` would never fire. `Watchdog`, an
+alert that always fires, comes with the stack: it proves the alerting chain is alive.
+
 ## Access
 
 Nothing is exposed on the internet. Through the Systems Manager tunnel:
