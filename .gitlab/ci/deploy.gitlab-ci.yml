@@ -35,6 +35,7 @@ deploy:lint-helm:
     - mkdir rendered/platform rendered/argocd rendered/sealed
     - cp deploy/platform/cert-manager/*.yaml rendered/platform/
     - for env in staging prod; do cp "deploy/environments/$env/sealed-secrets.yaml" "rendered/sealed/$env.yaml"; done
+    - cp deploy/platform/monitoring/sealed-secrets.yaml rendered/sealed/monitoring.yaml
     - cp deploy/argocd/root.yaml deploy/argocd/apps/*.yaml rendered/argocd/
   artifacts:
     expire_in: 1 week
